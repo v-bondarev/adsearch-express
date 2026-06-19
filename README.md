@@ -31,8 +31,25 @@
 
 - [Техническое задание](docs/technical-spec.md)
 - [Данные и доступы для Этапа 0](docs/stage-0-inputs.md)
+- [Тестовые запросы к Active Directory](docs/ad-test-queries.md)
+
+## Локальный запуск
+
+1. Создать `.env` на основе `.env.example`.
+2. Запустить приложение:
+
+```bash
+docker compose up --build
+```
+
+3. Проверить health endpoint:
+
+```bash
+curl http://127.0.0.1:${APP_PORT:-8000}/health
+```
+
+До завершения Этапа 0 обработка webhook и BotX-отправка работают как каркас: структура реальных webhook, JWT и endpoint исходящих сообщений должны быть подтверждены на тестовой регистрации express.ms.
 
 ## Репозиторий
 
 https://github.com/v-bondarev/adsearch-express.git
-
