@@ -32,6 +32,7 @@
 - [Техническое задание](docs/technical-spec.md)
 - [Данные и доступы для Этапа 0](docs/stage-0-inputs.md)
 - [Тестовые запросы к Active Directory](docs/ad-test-queries.md)
+- [Запуск на CentOS VM](docs/vm-deploy-centos.md)
 
 ## Локальный запуск
 
