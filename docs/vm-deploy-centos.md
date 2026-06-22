@@ -52,13 +52,38 @@ LDAP_PORT=636
 LDAP_USE_SSL=true
 LDAP_BIND_USER=
 LDAP_BIND_PASSWORD=
+LDAP_BIND_PASSWORD_FILE=
 LDAP_BASE_DN=
 LDAP_INCLUDED_OUS=
 LDAP_EXCLUDED_OUS=
 LDAP_CA_CERT_FILE=
 ```
 
-3. Если LDAPS требует корпоративный CA-сертификат, положить файл сертификата на VM и указать путь в `LDAP_CA_CERT_FILE`.
+3. Пароль bind-пользователя можно хранить одним из способов:
+
+- простой режим: заполнить `LDAP_BIND_PASSWORD` в локальном `.env`;
+- предпочтительный режим для VM: положить пароль в отдельный файл и указать путь в `LDAP_BIND_PASSWORD_FILE`.
+
+Пример с отдельным файлом:
+
+```bash
+sudo install -d -m 700 /etc/adsearch-express
+sudo touch /etc/adsearch-express/ldap_bind_password
+sudo chmod 600 /etc/adsearch-express/ldap_bind_password
+sudo chown root:root /etc/adsearch-express/ldap_bind_password
+sudoedit /etc/adsearch-express/ldap_bind_password
+```
+
+В `.env`:
+
+```dotenv
+LDAP_BIND_PASSWORD=
+LDAP_BIND_PASSWORD_FILE=/etc/adsearch-express/ldap_bind_password
+```
+
+Если указан `LDAP_BIND_PASSWORD_FILE`, приложение читает пароль из файла. Сам файл с паролем не коммитится.
+
+4. Если LDAPS требует корпоративный CA-сертификат, положить файл сертификата на VM и указать путь в `LDAP_CA_CERT_FILE`.
 
 ## Запуск через Docker Compose
 

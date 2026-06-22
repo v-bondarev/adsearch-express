@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     ldap_use_ssl: bool = True
     ldap_bind_user: str = ""
     ldap_bind_password: str = ""
+    ldap_bind_password_file: Path | None = None
     ldap_base_dn: str = ""
     ldap_included_ous: str = ""
     ldap_excluded_ous: str = ""
@@ -46,8 +47,20 @@ class Settings(BaseSettings):
     def excluded_ous(self) -> list[str]:
         return [item.strip() for item in self.ldap_excluded_ous.split(";") if item.strip()]
 
+    @field_validator("ldap_bind_password_file", mode="before")
+    @classmethod
+    def _empty_password_file_to_none(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
+
+    @property
+    def ldap_password(self) -> str:
+        if self.ldap_bind_password_file:
+            return self.ldap_bind_password_file.read_text(encoding="utf-8").strip()
+        return self.ldap_bind_password
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

@@ -36,7 +36,7 @@ class LdapClient:
         connection = Connection(
             server,
             user=self.settings.ldap_bind_user,
-            password=self.settings.ldap_bind_password,
+            password=self.settings.ldap_password,
             auto_bind=True,
             receive_timeout=self.settings.ldap_read_timeout_seconds,
         )
@@ -73,4 +73,3 @@ class LdapClient:
                 attributes=ALL_ATTRIBUTES,
             )
             return [entry.entry_attributes_as_dict for entry in connection.entries]
-
