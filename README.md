@@ -46,7 +46,7 @@ docker compose up --build
 3. Проверить health endpoint:
 
 ```bash
-curl http://127.0.0.1:${APP_PORT:-8000}/health
+curl http://127.0.0.1:${APP_PORT:-8181}/health
 ```
 
 До завершения Этапа 0 обработка webhook и BotX-отправка работают как каркас: структура реальных webhook, JWT и endpoint исходящих сообщений должны быть подтверждены на тестовой регистрации express.ms.

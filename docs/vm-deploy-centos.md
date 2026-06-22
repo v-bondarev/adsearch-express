@@ -110,7 +110,7 @@ docker compose up --build -d
 ```bash
 docker compose ps
 docker compose logs -f bot
-curl http://127.0.0.1:${APP_PORT:-8000}/health
+curl http://127.0.0.1:${APP_PORT:-8181}/health
 ```
 
 Ожидаемый ответ health endpoint:

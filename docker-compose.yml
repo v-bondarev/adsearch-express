@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${APP_PORT:-8181}:8000"
     volumes:
       - bot-data:/data
       - "${LDAP_BIND_PASSWORD_FILE_HOST:-/dev/null}:/run/secrets/ldap_bind_password:ro"
