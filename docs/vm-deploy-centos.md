@@ -47,7 +47,7 @@ APP_GID=1000
 BOT_ID=
 BOT_SECRET_KEY=
 BOTX_BASE_URL=
-BOTX_PROTO_VERSION=
+BOTX_PROTOCOL_VERSION=4
 BOT_ADMIN_HUIDS=
 
 LDAP_HOST=
@@ -135,8 +135,8 @@ docker compose logs -f bot
 - доступ VM к `LDAP_HOST:LDAP_PORT`;
 - корректность bind-пользователя и base DN;
 - список included/excluded OU;
-- формат входящего webhook express.ms;
-- endpoint и формат исходящих сообщений BotX;
-- JWT/подпись webhook, если она требуется express.ms.
+- формат входящего webhook express.ms: `command.body`, `from.group_chat_id`, `from.host`, `from.user_huid`;
+- endpoint исходящих сообщений BotX: `/api/v4/botx/notifications/direct/sync`;
+- авторизацию исходящих сообщений старым JWT-токеном: HS256, `iss=BOT_ID`, `aud=host`, `version=2`.
 
 Тестовые AD-запросы перечислены в [ad-test-queries.md](ad-test-queries.md).

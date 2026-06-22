@@ -9,13 +9,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "local"
-    app_port: int = 8000
+    app_port: int = 8181
     log_level: str = "INFO"
 
     bot_id: str = ""
     bot_secret_key: str = ""
     botx_base_url: str = ""
-    botx_proto_version: str = ""
+    botx_protocol_version: int = 4
     bot_admin_huids: str = ""
 
     ldap_host: str = ""

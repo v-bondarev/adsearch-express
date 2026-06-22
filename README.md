@@ -49,7 +49,7 @@ docker compose up --build
 curl http://127.0.0.1:${APP_PORT:-8181}/health
 ```
 
-До завершения Этапа 0 обработка webhook и BotX-отправка работают как каркас: структура реальных webhook, JWT и endpoint исходящих сообщений должны быть подтверждены на тестовой регистрации express.ms.
+Webhook express.ms обрабатывается на `/command` и совместимом `/webhook`. Для исходящих сообщений используется BotX API v4 endpoint `/api/v4/botx/notifications/direct/sync` и старый JWT-токен бота.
 
 ## Репозиторий
 

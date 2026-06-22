@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 
+from app.botx_client import BotxClient
 from app.cache import CardCache
 from app.config import get_settings
 from app.db import init_db
@@ -36,30 +37,50 @@ async def health() -> dict[str, str]:
 
 @app.post("/webhook")
 async def webhook(request: Request) -> dict[str, Any]:
-    body = await request.json()
-    logger.info("webhook received")
+    return await _handle_command(request)
 
-    # The exact express.ms webhook shape must be confirmed during Stage 0.
+
+@app.post("/command")
+async def command(request: Request) -> dict[str, Any]:
+    return await _handle_command(request)
+
+
+async def _handle_command(request: Request) -> dict[str, Any]:
+    body = await request.json()
+    logger.info("BotX command received")
+
     command = _extract_text(body)
     user_huid = _extract_user_huid(body)
+    chat_id = _extract_group_chat_id(body)
+    cts_host = _extract_cts_host(body)
 
     if command == "/clear_cache":
         if user_huid not in settings.admin_huids:
             logger.warning("cache clear denied")
-            return {"ok": True, "message": "Команда доступна только администраторам бота."}
+            message = "Команда доступна только администраторам бота."
+            sent = await _send_botx_message(chat_id, cts_host, message)
+            return {"status": "ok", "message": message, "sent": sent}
         deleted = card_cache.clear()
         logger.info("cache cleared")
-        return {"ok": True, "message": f"Кеш очищен. Удалено записей: {deleted}."}
+        message = f"Кеш очищен. Удалено записей: {deleted}."
+        sent = await _send_botx_message(chat_id, cts_host, message)
+        return {"status": "ok", "message": message, "sent": sent}
 
     if command in {"/start", "/help", ""}:
-        return {"ok": True, "message": "Напишите ФИО или часть ФИО сотрудника для поиска."}
+        message = "Напишите ФИО или часть ФИО сотрудника для поиска."
+        sent = await _send_botx_message(chat_id, cts_host, message)
+        return {"status": "ok", "message": message, "sent": sent}
 
     results = ldap_client.search_people(command)
-    return {"ok": True, "message": format_search_results(results, settings.search_limit)}
+    message = format_search_results(results, settings.search_limit)
+    sent = await _send_botx_message(chat_id, cts_host, message)
+    return {"status": "ok", "message": message, "sent": sent}
 
 
 def _extract_text(body: dict[str, Any]) -> str:
+    command = body.get("command") if isinstance(body.get("command"), dict) else {}
     candidates = [
+        command.get("body"),
         body.get("text"),
         body.get("body"),
         body.get("message", {}).get("text") if isinstance(body.get("message"), dict) else None,
@@ -72,13 +93,46 @@ def _extract_text(body: dict[str, Any]) -> str:
 
 
 def _extract_user_huid(body: dict[str, Any]) -> str:
+    sender = body.get("from") if isinstance(body.get("from"), dict) else {}
     candidates = [
+        sender.get("user_huid"),
         body.get("user_huid"),
         body.get("sender", {}).get("user_huid") if isinstance(body.get("sender"), dict) else None,
-        body.get("from", {}).get("user_huid") if isinstance(body.get("from"), dict) else None,
     ]
     for candidate in candidates:
         if isinstance(candidate, str):
             return candidate.strip()
     return ""
 
+
+def _extract_group_chat_id(body: dict[str, Any]) -> str:
+    sender = body.get("from") if isinstance(body.get("from"), dict) else {}
+    candidates = [
+        sender.get("group_chat_id"),
+        body.get("group_chat_id"),
+        body.get("chat", {}).get("id") if isinstance(body.get("chat"), dict) else None,
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, str):
+            return candidate.strip()
+    return ""
+
+
+def _extract_cts_host(body: dict[str, Any]) -> str:
+    sender = body.get("from") if isinstance(body.get("from"), dict) else {}
+    candidates = [
+        sender.get("host"),
+        body.get("host"),
+        settings.botx_base_url,
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, str):
+            return candidate.strip()
+    return ""
+
+
+async def _send_botx_message(chat_id: str, cts_host: str, message: str) -> bool:
+    if not chat_id:
+        logger.info("BotX send skipped: group_chat_id is empty")
+        return False
+    return await BotxClient(settings, cts_host).send_text(chat_id, message)
