@@ -41,6 +41,9 @@ cp .env.example .env
 2. Заполнить реальные значения:
 
 ```dotenv
+APP_UID=1000
+APP_GID=1000
+
 BOT_ID=
 BOT_SECRET_KEY=
 BOTX_BASE_URL=
@@ -52,7 +55,8 @@ LDAP_PORT=636
 LDAP_USE_SSL=true
 LDAP_BIND_USER=
 LDAP_BIND_PASSWORD=
-LDAP_BIND_PASSWORD_FILE=
+LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap_bind_password
+LDAP_BIND_PASSWORD_FILE_HOST=/etc/adsearch-express/ldap_bind_password
 LDAP_BASE_DN=
 LDAP_INCLUDED_OUS=
 LDAP_EXCLUDED_OUS=
@@ -62,26 +66,36 @@ LDAP_CA_CERT_FILE=
 3. Пароль bind-пользователя можно хранить одним из способов:
 
 - простой режим: заполнить `LDAP_BIND_PASSWORD` в локальном `.env`;
-- предпочтительный режим для VM: положить пароль в отдельный файл и указать путь в `LDAP_BIND_PASSWORD_FILE`.
+- предпочтительный режим для VM: положить пароль в отдельный файл на VM и смонтировать его read-only в контейнер.
 
-Пример с отдельным файлом:
+Если контейнер запускается под пользователем `vbondarev`, задайте в `.env` UID/GID этого пользователя на VM:
+
+```bash
+id -u vbondarev
+id -g vbondarev
+```
+
+Пример с отдельным файлом на VM:
 
 ```bash
 sudo install -d -m 700 /etc/adsearch-express
 sudo touch /etc/adsearch-express/ldap_bind_password
+sudo chown vbondarev:vbondarev /etc/adsearch-express/ldap_bind_password
 sudo chmod 600 /etc/adsearch-express/ldap_bind_password
-sudo chown root:root /etc/adsearch-express/ldap_bind_password
 sudoedit /etc/adsearch-express/ldap_bind_password
 ```
 
 В `.env`:
 
 ```dotenv
+APP_UID=1000
+APP_GID=1000
 LDAP_BIND_PASSWORD=
-LDAP_BIND_PASSWORD_FILE=/etc/adsearch-express/ldap_bind_password
+LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap_bind_password
+LDAP_BIND_PASSWORD_FILE_HOST=/etc/adsearch-express/ldap_bind_password
 ```
 
-Если указан `LDAP_BIND_PASSWORD_FILE`, приложение читает пароль из файла. Сам файл с паролем не коммитится.
+`LDAP_BIND_PASSWORD_FILE_HOST` используется Docker Compose для read-only mount с VM. `LDAP_BIND_PASSWORD_FILE` указывает путь уже внутри контейнера. Сам файл с паролем не коммитится.
 
 4. Если LDAPS требует корпоративный CA-сертификат, положить файл сертификата на VM и указать путь в `LDAP_CA_CERT_FILE`.
 
