@@ -77,6 +77,18 @@ docker compose run --rm bot python scripts/ldap_test_queries.py \
 
 Скрипт не печатает пароль bind-пользователя. Бинарные атрибуты `objectGUID`, `thumbnailPhoto` и `jpegPhoto` выводятся только как краткое описание размера.
 
+### Подтвержденные атрибуты HCI
+
+По тестовому поиску `Иванова` подтверждено:
+
+- `displayName`, `cn`, `name` содержат русское ФИО.
+- У части users `sn` и `givenName` заполнены латиницей, например `Ivanova`/`Ekaterina`.
+- Для users в `HCI_Users` русские части ФИО встречаются в Exchange extension attributes:
+  `extensionAttribute1` — фамилия, `extensionAttribute2` — имя, `extensionAttribute3` — отчество.
+- `title`, `department`, `company`, `mail`, `telephoneNumber`, `mobile`, `physicalDeliveryOfficeName`, `manager` подходят для карточки.
+- `thumbnailPhoto` может содержать фото пользователя.
+- Отключенных users можно исключать через `userAccountControl:1.2.840.113556.1.4.803:=2`.
+
 ### Частые ошибки
 
 Если скрипт пишет `LDAP password contains ASCII control characters` или `SASLprep error: ASCII control character present`, в файле пароля есть невидимый управляющий символ. Перезапишите файл одной строкой:
