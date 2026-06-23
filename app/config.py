@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     botx_base_url: str = ""
     botx_protocol_version: int = 4
     bot_admin_huids: str = ""
+    bot_admin_alert_chat_ids: str = ""
 
     ldap_host: str = ""
     ldap_port: int = 636
@@ -39,6 +40,10 @@ class Settings(BaseSettings):
     @property
     def admin_huids(self) -> set[str]:
         return {item.strip() for item in self.bot_admin_huids.split(",") if item.strip()}
+
+    @property
+    def admin_alert_chat_ids(self) -> list[str]:
+        return [item.strip() for item in self.bot_admin_alert_chat_ids.split(",") if item.strip()]
 
     @property
     def included_ous(self) -> list[str]:

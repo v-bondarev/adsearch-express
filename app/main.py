@@ -233,8 +233,10 @@ async def _notify_admins_about_restricted_query(
     user_huid: str,
     query: str,
 ) -> bool:
-    if not settings.admin_huids:
-        logger.warning("Restricted query admin notification skipped: BOT_ADMIN_HUIDS is empty")
+    if not settings.admin_huids and not settings.admin_alert_chat_ids:
+        logger.warning(
+            "Restricted query admin notification skipped: BOT_ADMIN_HUIDS and BOT_ADMIN_ALERT_CHAT_IDS are empty"
+        )
         return False
 
     user_label = user_display_name or "<имя не передано eXpress>"
@@ -246,6 +248,15 @@ async def _notify_admins_about_restricted_query(
         f"Чат: {chat_id}\n"
         f"Запрос: {query}"
     )
+
+    if settings.admin_alert_chat_ids:
+        client = BotxClient(settings, cts_host)
+        sent_results = []
+        for admin_chat_id in settings.admin_alert_chat_ids:
+            sent_results.append(await client.send_text(admin_chat_id, message))
+        return all(sent_results)
+
+    logger.info("Restricted query admin notification uses recipients fallback")
     return await BotxClient(settings, cts_host).send_text(
         "",
         message,
