@@ -316,16 +316,10 @@ def _extract_express_profile_link(payload: dict[str, Any], cts_host: str = "") -
     return None
 
 
-def _build_express_profile_url(user_huid: str, cts_host: str) -> str:
+def _build_express_profile_url(user_huid: str, _cts_host: str) -> str:
     if settings.botx_profile_url_template:
         return settings.botx_profile_url_template.format(user_huid=user_huid)
-
-    host = (cts_host or settings.botx_base_url).strip().rstrip("/")
-    if host and not host.startswith(("http://", "https://")):
-        host = f"https://{host}"
-    if not host:
-        return user_huid
-    return f"{host}/profile/{user_huid}"
+    return f"https://xlnk.ms/open/profile/{user_huid}"
 
 
 def _extract_user_payload(payload: dict[str, Any]) -> dict[str, Any]:

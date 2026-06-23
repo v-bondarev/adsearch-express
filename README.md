@@ -71,7 +71,7 @@ BOT_ID=<uuid бота>
 BOT_SECRET_KEY=<secret_key бота>
 BOTX_PROTOCOL_VERSION=4
 BOTX_BASE_URL=<адрес CTS/BotX>
-BOTX_PROFILE_URL_TEMPLATE=https://express.example.com/profile/{user_huid}
+BOTX_PROFILE_URL_TEMPLATE=https://xlnk.ms/open/profile/{user_huid}
 
 LDAP_HOST=10.0.0.10
 LDAP_PORT=636
