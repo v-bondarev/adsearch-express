@@ -44,6 +44,13 @@ LDAP_BASE_DN=DC=example,DC=local
 LDAP_INCLUDED_OUS=OU=Users,DC=example,DC=local;OU=Contacts,DC=example,DC=local
 ```
 
+Для текущего домена `hci.interros.ru`, если искать нужно во всех вложенных контейнерах внутри `HCI` и `HCI_Users`, достаточно указать эти две стартовые базы. Скрипт и приложение используют subtree-поиск:
+
+```dotenv
+LDAP_BASE_DN=DC=hci,DC=interros,DC=ru
+LDAP_INCLUDED_OUS=OU=HCI,DC=hci,DC=interros,DC=ru;OU=HCI_Users,DC=hci,DC=interros,DC=ru
+```
+
 Проверка конкретного LDAP-фильтра:
 
 ```bash

@@ -4,6 +4,7 @@ import json
 import ssl
 import sys
 from collections.abc import Iterable
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -259,8 +260,20 @@ def _sanitize_entry(attributes: dict[str, Any]) -> dict[str, Any]:
         if key in BINARY_ATTRIBUTES:
             sanitized[key] = _binary_summary(value)
         else:
-            sanitized[key] = value
+            sanitized[key] = _json_safe(value)
     return sanitized
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, datetime | date):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return f"<binary bytes={len(value)}>"
+    return value
 
 
 def _binary_summary(value: Any) -> str:
