@@ -1,6 +1,7 @@
 import logging
 import re
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -12,6 +13,7 @@ from app.db import init_db
 from app.formatter import format_search_messages, format_search_results
 from app.ldap_client import LdapClient
 from app.logging_config import configure_logging
+from app.models import SearchResult
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -88,7 +90,7 @@ async def _handle_command(request: Request) -> dict[str, Any]:
         )
         return {"status": "ok", "message": RESTRICTED_MESSAGE, "sent": sent, "admin_sent": admin_sent}
 
-    results = ldap_client.search_people(command)
+    results = await _enrich_results_with_express_links(ldap_client.search_people(command), cts_host)
     message = format_search_results(results, settings.search_limit)
     sent = await _send_botx_messages(
         chat_id,
@@ -262,3 +264,68 @@ async def _notify_admins_about_restricted_query(
         message,
         recipients=sorted(settings.admin_huids),
     )
+
+
+async def _enrich_results_with_express_links(results: list[SearchResult], cts_host: str) -> list[SearchResult]:
+    if not results:
+        return results
+
+    client = BotxClient(settings, cts_host)
+    enriched_results = []
+    for result in results:
+        express_link = await _find_express_profile_link(client, result.email)
+        if express_link:
+            enriched_results.append(replace(result, express_chat_url=express_link))
+        else:
+            enriched_results.append(result)
+    return enriched_results
+
+
+async def _find_express_profile_link(client: BotxClient, email: str | None) -> str | None:
+    if not email:
+        return None
+    payload = await client.get_user_by_email(email)
+    if not payload:
+        return None
+    return _extract_express_profile_link(payload)
+
+
+def _extract_express_profile_link(payload: dict[str, Any]) -> str | None:
+    user = _extract_user_payload(payload)
+    link = _first_string(
+        user,
+        [
+            "profile_url",
+            "profileUrl",
+            "profile_link",
+            "profileLink",
+            "deep_link",
+            "deepLink",
+            "chat_link",
+            "chatLink",
+            "link",
+            "url",
+        ],
+    )
+    if link:
+        return link
+
+    user_huid = _first_string(user, ["user_huid", "userHuid", "huid", "id"])
+    if user_huid:
+        return f"express://user/{user_huid}"
+    return None
+
+
+def _extract_user_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    for key in ["result", "data", "user"]:
+        value = payload.get(key)
+        if isinstance(value, list):
+            first_item = next((item for item in value if isinstance(item, dict)), None)
+            if isinstance(first_item, dict):
+                return first_item
+        if isinstance(value, dict):
+            nested_user = value.get("user")
+            if isinstance(nested_user, dict):
+                return nested_user
+            return value
+    return payload

@@ -62,6 +62,7 @@ class BotxClient:
         self.settings = settings
         self.host = _normalize_host(cts_host or settings.botx_base_url)
         self.endpoint = f"{self.host}/api/v4/botx/notifications/direct/sync"
+        self.users_by_email_endpoint = f"{self.host}/api/v3/botx/users/by_email"
 
     async def send_text(self, chat_id: str, text: str, recipients: list[str] | None = None) -> bool:
         payload: dict[str, Any] = {
@@ -85,13 +86,59 @@ class BotxClient:
         }
         return await self._post(payload)
 
+    async def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+        if not email:
+            return None
+
+        response = await self._request("GET", self.users_by_email_endpoint, params={"email": email})
+        if response is None:
+            return None
+        if response.status_code == 405:
+            response = await self._request("POST", self.users_by_email_endpoint, json_payload={"email": email})
+            if response is None:
+                return None
+
+        if response.status_code == 404:
+            logger.info("BotX user by email not found")
+            return None
+        if response.status_code not in {200, 202}:
+            logger.error("BotX user by email failed: status=%s body=%s", response.status_code, response.text[:300])
+            return None
+
+        try:
+            payload = response.json()
+        except json.JSONDecodeError:
+            logger.error("BotX user by email returned invalid JSON")
+            return None
+        if isinstance(payload, dict):
+            return payload
+        logger.error("BotX user by email returned unexpected payload type")
+        return None
+
     async def _post(self, payload: dict[str, Any]) -> bool:
+        response = await self._request("POST", self.endpoint, json_payload=payload)
+        if response is None:
+            return False
+
+        if response.status_code in {200, 202}:
+            return True
+        logger.error("BotX send failed: status=%s body=%s", response.status_code, response.text[:300])
+        return False
+
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_payload: dict[str, Any] | None = None,
+    ) -> httpx.Response | None:
         if not self.host:
-            logger.error("BotX send skipped: host is not configured")
-            return False
+            logger.error("BotX request skipped: host is not configured")
+            return None
         if not self.settings.bot_id or not self.settings.bot_secret_key:
-            logger.error("BotX send skipped: bot credentials are not configured")
-            return False
+            logger.error("BotX request skipped: bot credentials are not configured")
+            return None
 
         headers = {
             "Authorization": f"Bearer {_make_token(self.settings, self.host)}",
@@ -99,15 +146,16 @@ class BotxClient:
         }
         async with create_http_client() as client:
             try:
-                response = await client.post(self.endpoint, json=payload, headers=headers)
+                return await client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=json_payload,
+                    headers=headers,
+                )
             except httpx.RequestError as exc:
                 logger.error("BotX network error: %s", exc)
-                return False
-
-        if response.status_code in {200, 202}:
-            return True
-        logger.error("BotX send failed: status=%s body=%s", response.status_code, response.text[:300])
-        return False
+                return None
 
     async def close(self) -> None:
         pass
