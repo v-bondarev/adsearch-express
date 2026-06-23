@@ -188,6 +188,11 @@ def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchRes
         title=card.title,
         department=card.department,
         company=card.company,
+        phone=card.phone,
+        email=card.email,
+        office=card.office,
+        room=card.room,
+        manager=card.manager,
         object_type=card.object_type,
     )
 

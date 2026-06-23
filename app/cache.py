@@ -44,6 +44,7 @@ class CardCache:
             "office": card.office,
             "room": card.room,
             "manager": card.manager,
+            "express_chat_url": card.express_chat_url,
             "object_type": card.object_type,
             "from_cache": False,
         }

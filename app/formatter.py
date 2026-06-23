@@ -7,16 +7,9 @@ def format_search_results(results: list[SearchResult], limit: int) -> str:
 
     lines = ["Найдены сотрудники:"]
     for index, result in enumerate(results[:limit], start=1):
-        lines.append(f"{index}. {result.display_name}")
-        parts = []
-        if result.title:
-            parts.append(f"Должность: {result.title}")
-        if result.department:
-            parts.append(f"Подразделение: {result.department}")
-        if result.company:
-            parts.append(f"Компания: {result.company}")
-        for part in parts:
-            lines.append(f"   {part}")
+        if index > 1:
+            lines.append("")
+        lines.extend(_format_person_fields(result, prefix=f"{index}. "))
 
     if len(results) > limit:
         lines.append("Найдено слишком много совпадений. Напишите новый запрос с более полными данными.")
@@ -29,20 +22,25 @@ def format_employee_card(card: EmployeeCard) -> str:
     if card.from_cache:
         lines.append("Поиск временно недоступен, показан возможно устаревший результат.")
 
-    lines.append(card.display_name)
+    lines.extend(_format_person_fields(card))
+
+    return "\n".join(lines)
+
+
+def _format_person_fields(person: SearchResult | EmployeeCard, prefix: str = "") -> list[str]:
+    lines = [f"{prefix}{person.display_name}"]
     optional_fields = [
-        ("Должность", card.title),
-        ("Подразделение", card.department),
-        ("Компания", card.company),
-        ("Рабочий телефон", card.phone),
-        ("Мобильный телефон", card.mobile),
-        ("Email", card.email),
-        ("Офис", card.office),
-        ("Кабинет", card.room),
-        ("Руководитель", card.manager),
+        ("Должность", person.title),
+        ("Подразделение", person.department),
+        ("Компания", person.company),
+        ("☎️ Внутренний телефон", person.phone),
+        ("✉️ E-mail", person.email),
+        ("🚪 Кабинет", person.room),
+        ("🏢 Офис", person.office),
+        ("👤 Руководитель", person.manager),
+        ("💬 Ссылка на чат в eXpress", person.express_chat_url),
     ]
     for label, value in optional_fields:
         if value:
             lines.append(f"{label}: {value}")
-
-    return "\n".join(lines)
+    return lines

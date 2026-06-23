@@ -8,6 +8,12 @@ class SearchResult:
     title: str | None = None
     department: str | None = None
     company: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    office: str | None = None
+    room: str | None = None
+    manager: str | None = None
+    express_chat_url: str | None = None
     object_type: str | None = None
 
 
@@ -24,6 +30,7 @@ class EmployeeCard:
     office: str | None = None
     room: str | None = None
     manager: str | None = None
+    express_chat_url: str | None = None
     photo: bytes | None = None
     object_type: str | None = None
     from_cache: bool = False
