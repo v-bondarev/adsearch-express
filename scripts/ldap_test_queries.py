@@ -46,6 +46,7 @@ def main() -> int:
     parser.add_argument("--filter", help="Custom LDAP filter. Overrides --query.")
     parser.add_argument("--limit", type=int, default=5, help="Maximum entries to print per search base.")
     parser.add_argument("--all-attributes", action="store_true", help="Request all regular and operational attributes.")
+    parser.add_argument("--list-ous", action="store_true", help="List organizationalUnit objects for base DN discovery.")
     args = parser.parse_args()
 
     settings = Settings()
@@ -65,10 +66,15 @@ def main() -> int:
         return 2
 
     try:
-        _print_root_dse(connection)
+        root_dse = _print_root_dse(connection)
+        search_bases = _search_bases(settings, root_dse)
+        if args.list_ous:
+            _print_ous(connection, search_bases, args.limit)
+            return 0
+
         ldap_filter = args.filter or _query_filter(args.query)
         attributes: list[str] | str = ALL_ATTRIBUTES if args.all_attributes else DEFAULT_ATTRIBUTES
-        for search_base in _search_bases(settings):
+        for search_base in search_bases:
             print(f"\n== Search base: {search_base}")
             connection.search(
                 search_base=search_base,
@@ -97,8 +103,6 @@ def _validate_settings(settings: Settings) -> None:
         missing.append("LDAP_BIND_USER")
     if not settings.ldap_password:
         missing.append("LDAP_BIND_PASSWORD or LDAP_BIND_PASSWORD_FILE")
-    if not settings.ldap_base_dn and not settings.included_ous:
-        missing.append("LDAP_BASE_DN or LDAP_INCLUDED_OUS")
 
     diagnostics = settings.ldap_password_diagnostics
     if diagnostics["has_control_chars"]:
@@ -163,7 +167,7 @@ def _password_source(settings: Settings) -> str:
     return "<empty>"
 
 
-def _print_root_dse(connection: Connection) -> None:
+def _print_root_dse(connection: Connection) -> dict[str, Any]:
     print("\n== RootDSE")
     connection.search(
         search_base="",
@@ -171,12 +175,43 @@ def _print_root_dse(connection: Connection) -> None:
         search_scope=BASE,
         attributes=["defaultNamingContext", "namingContexts", "supportedLDAPVersion"],
     )
+    root_dse: dict[str, Any] = {}
     for entry in connection.entries:
-        print(json.dumps(_sanitize_entry(entry.entry_attributes_as_dict), ensure_ascii=False, indent=2))
+        root_dse = _sanitize_entry(entry.entry_attributes_as_dict)
+        print(json.dumps(root_dse, ensure_ascii=False, indent=2))
+    return root_dse
 
 
-def _search_bases(settings: Settings) -> list[str]:
-    return settings.included_ous or [settings.ldap_base_dn]
+def _search_bases(settings: Settings, root_dse: dict[str, Any]) -> list[str]:
+    if settings.included_ous:
+        return settings.included_ous
+    if settings.ldap_base_dn:
+        return [settings.ldap_base_dn]
+    default_naming_context = root_dse.get("defaultNamingContext")
+    if isinstance(default_naming_context, list) and default_naming_context:
+        return [str(default_naming_context[0])]
+    if isinstance(default_naming_context, str) and default_naming_context:
+        return [default_naming_context]
+    naming_contexts = root_dse.get("namingContexts")
+    if isinstance(naming_contexts, list) and naming_contexts:
+        return [str(naming_contexts[0])]
+    raise SystemExit("ERROR: cannot determine search base from RootDSE. Set LDAP_BASE_DN manually.")
+
+
+def _print_ous(connection: Connection, search_bases: list[str], limit: int) -> None:
+    for search_base in search_bases:
+        print(f"\n== Organizational units under: {search_base}")
+        connection.search(
+            search_base=search_base,
+            search_filter="(objectClass=organizationalUnit)",
+            search_scope=SUBTREE,
+            attributes=["distinguishedName", "ou", "description"],
+            size_limit=limit,
+        )
+        print(f"Returned OUs: {len(connection.entries)}")
+        for index, entry in enumerate(connection.entries, start=1):
+            print(f"\n-- OU {index}")
+            print(json.dumps(_sanitize_entry(entry.entry_attributes_as_dict), ensure_ascii=False, indent=2))
 
 
 def _query_filter(query: str | None) -> str:

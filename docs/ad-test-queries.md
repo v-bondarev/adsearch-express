@@ -29,6 +29,21 @@ docker compose run --rm bot python scripts/ldap_test_queries.py --query "<ФИО
 docker compose run --rm bot python scripts/ldap_test_queries.py
 ```
 
+Если `LDAP_BASE_DN` и `LDAP_INCLUDED_OUS` еще неизвестны, скрипт сначала читает RootDSE и использует `defaultNamingContext` как временную базу поиска. Значение `defaultNamingContext` обычно и есть базовый DN домена, например `DC=example,DC=local`.
+
+Вывести OU-кандидаты:
+
+```bash
+docker compose run --rm bot python scripts/ldap_test_queries.py --list-ous --limit 30
+```
+
+После этого можно зафиксировать в `.env`:
+
+```dotenv
+LDAP_BASE_DN=DC=example,DC=local
+LDAP_INCLUDED_OUS=OU=Users,DC=example,DC=local;OU=Contacts,DC=example,DC=local
+```
+
 Проверка конкретного LDAP-фильтра:
 
 ```bash
@@ -56,7 +71,7 @@ sudoedit /etc/adsearch-express/ldap_bind_password
 
 В файле должен быть только пароль, без пустых строк до/после и без вставленных управляющих символов. Обычный перевод строки в конце файла допустим: приложение его срезает.
 
-Если в summary видно `base_dn:` пустой и `included_ous: <none>`, заполните в `.env` минимум один из параметров:
+Если в summary видно `base_dn:` пустой и `included_ous: <none>`, скрипт попробует взять `defaultNamingContext` из RootDSE. После discovery лучше заполнить в `.env` минимум один из параметров:
 
 ```dotenv
 LDAP_BASE_DN=DC=example,DC=local
