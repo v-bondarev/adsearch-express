@@ -2,6 +2,50 @@
 
 Документ описывает набор проверок для Этапа 0. Цель этапа: подтвердить реальные LDAPS-параметры, LDAP-фильтры, доступные атрибуты и правила исключения лишних объектов до разработки основной логики.
 
+## Проверка через приложение
+
+Основной способ проверки на VM — запуск скрипта, который использует те же `.env`-параметры, что и приложение:
+
+```bash
+cd /opt/adsearch-express
+docker compose run --rm bot python scripts/ldap_test_queries.py --query "<ФИО или часть фамилии>"
+```
+
+Скрипт использует:
+
+- `LDAP_HOST`, `LDAP_PORT`, `LDAP_USE_SSL`;
+- `LDAP_BIND_USER`;
+- `LDAP_BIND_PASSWORD` или `LDAP_BIND_PASSWORD_FILE`;
+- `LDAP_BASE_DN`;
+- `LDAP_INCLUDED_OUS`;
+- `LDAP_EXCLUDED_OUS`;
+- `LDAP_CA_CERT_FILE`;
+- `LDAP_CONNECT_TIMEOUT_SECONDS`;
+- `LDAP_READ_TIMEOUT_SECONDS`.
+
+Проверка только bind и базового поиска:
+
+```bash
+docker compose run --rm bot python scripts/ldap_test_queries.py
+```
+
+Проверка конкретного LDAP-фильтра:
+
+```bash
+docker compose run --rm bot python scripts/ldap_test_queries.py \
+  --filter "(&(objectClass=user)(objectCategory=person)(cn=<ФИО>))"
+```
+
+Получение всех доступных атрибутов:
+
+```bash
+docker compose run --rm bot python scripts/ldap_test_queries.py \
+  --query "<ФИО>" \
+  --all-attributes
+```
+
+Скрипт не печатает пароль bind-пользователя. Бинарные атрибуты `objectGUID`, `thumbnailPhoto` и `jpegPhoto` выводятся только как краткое описание размера.
+
 Команды ниже не содержат секретов. Значения в угловых скобках нужно заменить на реальные параметры окружения.
 
 ## Переменные
@@ -175,4 +219,3 @@ LDAPTLS_CACERT="$LDAP_CA_CERT_FILE" ldapsearch \
 - Атрибуты для ФИО, должности, подразделения, телефонов, email, кабинета, руководителя и фото.
 - Правила исключения отключенных, сервисных, технических и скрытых объектов.
 - Максимальный размер фото и необходимость ресайза перед отправкой в express.ms.
-

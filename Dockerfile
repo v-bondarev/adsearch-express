@@ -12,6 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY scripts ./scripts
 
 RUN groupadd --gid "${APP_GID}" vbondarev \
     && useradd --uid "${APP_UID}" --gid "${APP_GID}" --create-home --shell /usr/sbin/nologin vbondarev \
