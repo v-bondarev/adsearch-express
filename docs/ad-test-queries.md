@@ -86,6 +86,10 @@ docker compose run --rm bot python scripts/ldap_test_queries.py \
 - Для users в `HCI_Users` русские части ФИО встречаются в Exchange extension attributes:
   `extensionAttribute1` — фамилия, `extensionAttribute2` — имя, `extensionAttribute3` — отчество.
 - `title`, `department`, `company`, `mail`, `telephoneNumber`, `mobile`, `physicalDeliveryOfficeName`, `manager` подходят для карточки.
+- ФИО в карточке берем из `cn`. Если в `cn` есть суффикс в скобках, скобки убираются из ФИО.
+- Если `company` пустая, компания берется из суффикса в скобках у `cn`.
+- `manager` хранится DN-строкой, в карточку выводится только CN руководителя.
+- `physicalDeliveryOfficeName` разбивается на офис и кабинет: `БЯ-9\317` -> офис `БЯ9`, кабинет `317`.
 - `thumbnailPhoto` может содержать фото пользователя.
 - Отключенных users можно исключать через `userAccountControl:1.2.840.113556.1.4.803:=2`.
 

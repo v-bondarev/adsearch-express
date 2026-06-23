@@ -1,15 +1,18 @@
 import logging
+import re
 import ssl
 from contextlib import contextmanager
 from typing import Iterator
 
-from ldap3 import ALL, ALL_ATTRIBUTES, SUBTREE, Connection, Server, Tls
+from ldap3 import ALL, ALL_ATTRIBUTES, BASE, SUBTREE, Connection, Server, Tls
 from ldap3.utils.conv import escape_filter_chars
 
 from app.config import Settings
 from app.models import EmployeeCard, SearchResult
 
 logger = logging.getLogger(__name__)
+
+PARENTHESIZED_SUFFIX_RE = re.compile(r"\s*\(([^()]*)\)\s*$")
 
 SEARCH_ATTRIBUTES = [
     "distinguishedName",
@@ -107,10 +110,17 @@ class LdapClient:
         return sorted(results, key=_search_result_sort_key)
 
     def get_card(self, object_id: str) -> EmployeeCard | None:
-        # Final attribute mapping must be confirmed during Stage 0.
         logger.info("LDAP card lookup requested")
-        _ = object_id
-        return None
+        with self._connection() as connection:
+            connection.search(
+                search_base=object_id,
+                search_filter="(objectClass=*)",
+                search_scope=BASE,
+                attributes=SEARCH_ATTRIBUTES,
+            )
+            if not connection.entries:
+                return None
+            return _entry_to_employee_card(connection.entries[0].entry_attributes_as_dict, object_id)
 
     def dump_test_object_attributes(self, ldap_filter: str) -> list[dict[str, object]]:
         with self._connection() as connection:
@@ -171,19 +181,81 @@ def _build_people_filter(query: str) -> str:
 
 
 def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchResult:
-    object_classes = [item.lower() for item in _get_values(attributes, "objectClass")]
-    object_type = "contact" if "contact" in object_classes else "user"
-    department = _first_value(attributes, "department") or _first_value(attributes, "company")
+    card = _entry_to_employee_card(attributes, dn)
+    department = card.department or _first_value(attributes, "company")
     return SearchResult(
         object_id=dn,
-        display_name=_first_value(attributes, "displayName")
-        or _first_value(attributes, "cn")
-        or _first_value(attributes, "name")
-        or dn,
+        display_name=card.display_name,
+        title=card.title,
+        department=department or card.company,
+        company=card.company,
+        object_type=card.object_type,
+    )
+
+
+def _entry_to_employee_card(attributes: dict[str, object], dn: str) -> EmployeeCard:
+    object_classes = [item.lower() for item in _get_values(attributes, "objectClass")]
+    object_type = "contact" if "contact" in object_classes else "user"
+    display_name, company = _split_name_and_company(_first_value(attributes, "cn") or _first_value(attributes, "name") or dn)
+    existing_company = _first_value(attributes, "company")
+    company = existing_company or company
+    office, room = _split_office_room(_first_value(attributes, "physicalDeliveryOfficeName"))
+
+    return EmployeeCard(
+        object_id=dn,
+        display_name=display_name,
         title=_first_value(attributes, "title"),
-        department=department,
+        department=_first_value(attributes, "department"),
+        company=company,
+        phone=_first_value(attributes, "telephoneNumber"),
+        mobile=_first_value(attributes, "mobile"),
+        email=_first_value(attributes, "mail"),
+        office=office,
+        room=room,
+        manager=_manager_display_name(_first_value(attributes, "manager")),
+        photo=_first_bytes(attributes, "thumbnailPhoto"),
         object_type=object_type,
     )
+
+
+def _split_name_and_company(cn: str) -> tuple[str, str | None]:
+    match = PARENTHESIZED_SUFFIX_RE.search(cn)
+    if not match:
+        return cn.strip(), None
+    name = cn[: match.start()].strip()
+    company = match.group(1).strip() or None
+    return name, company
+
+
+def _manager_display_name(manager_dn: str | None) -> str | None:
+    if not manager_dn:
+        return None
+    if not manager_dn.lower().startswith("cn="):
+        return manager_dn
+    cn_part = manager_dn[3:].split(",OU=", 1)[0].split(",CN=", 1)[0].split(",DC=", 1)[0]
+    return cn_part.replace(r"\,", ",").strip() or None
+
+
+def _split_office_room(value: str | None) -> tuple[str | None, str | None]:
+    if not value:
+        return None, None
+    if "\\" not in value:
+        return _normalize_office(value), None
+    office, room = value.split("\\", 1)
+    return _normalize_office(office), room.strip() or None
+
+
+def _normalize_office(value: str) -> str | None:
+    normalized = value.strip().replace("-", "")
+    return normalized or None
+
+
+def _first_bytes(attributes: dict[str, object], name: str) -> bytes | None:
+    values = _get_values(attributes, name)
+    for value in values:
+        if isinstance(value, bytes):
+            return value
+    return None
 
 
 def _first_value(attributes: dict[str, object], name: str) -> str | None:

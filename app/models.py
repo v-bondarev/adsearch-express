@@ -7,6 +7,7 @@ class SearchResult:
     display_name: str
     title: str | None = None
     department: str | None = None
+    company: str | None = None
     object_type: str | None = None
 
 
@@ -16,12 +17,13 @@ class EmployeeCard:
     display_name: str
     title: str | None = None
     department: str | None = None
+    company: str | None = None
     phone: str | None = None
     mobile: str | None = None
     email: str | None = None
     office: str | None = None
+    room: str | None = None
     manager: str | None = None
     photo: bytes | None = None
     object_type: str | None = None
     from_cache: bool = False
-

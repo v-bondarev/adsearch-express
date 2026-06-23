@@ -37,10 +37,12 @@ class CardCache:
             "display_name": card.display_name,
             "title": card.title,
             "department": card.department,
+            "company": card.company,
             "phone": card.phone,
             "mobile": card.mobile,
             "email": card.email,
             "office": card.office,
+            "room": card.room,
             "manager": card.manager,
             "object_type": card.object_type,
             "from_cache": False,
@@ -64,4 +66,3 @@ class CardCache:
         with connect(self.db_path) as connection:
             cursor = connection.execute("DELETE FROM employee_card_cache")
             return cursor.rowcount
-

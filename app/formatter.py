@@ -29,10 +29,12 @@ def format_employee_card(card: EmployeeCard) -> str:
     optional_fields = [
         ("Должность", card.title),
         ("Подразделение", card.department),
+        ("Компания", card.company),
         ("Рабочий телефон", card.phone),
         ("Мобильный телефон", card.mobile),
         ("Email", card.email),
-        ("Кабинет", card.office),
+        ("Офис", card.office),
+        ("Кабинет", card.room),
         ("Руководитель", card.manager),
     ]
     for label, value in optional_fields:
@@ -40,4 +42,3 @@ def format_employee_card(card: EmployeeCard) -> str:
             lines.append(f"{label}: {value}")
 
     return "\n".join(lines)
-
