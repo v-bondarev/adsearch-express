@@ -273,7 +273,7 @@ async def _enrich_results_with_express_links(results: list[SearchResult], cts_ho
     client = BotxClient(settings, cts_host)
     enriched_results = []
     for result in results:
-        express_link = await _find_express_profile_link(client, result.email)
+        express_link = await _find_express_profile_link(client, result.email, cts_host)
         if express_link:
             enriched_results.append(replace(result, express_chat_url=express_link))
         else:
@@ -281,16 +281,16 @@ async def _enrich_results_with_express_links(results: list[SearchResult], cts_ho
     return enriched_results
 
 
-async def _find_express_profile_link(client: BotxClient, email: str | None) -> str | None:
+async def _find_express_profile_link(client: BotxClient, email: str | None, cts_host: str) -> str | None:
     if not email:
         return None
     payload = await client.get_user_by_email(email)
     if not payload:
         return None
-    return _extract_express_profile_link(payload)
+    return _extract_express_profile_link(payload, cts_host)
 
 
-def _extract_express_profile_link(payload: dict[str, Any]) -> str | None:
+def _extract_express_profile_link(payload: dict[str, Any], cts_host: str = "") -> str | None:
     user = _extract_user_payload(payload)
     link = _first_string(
         user,
@@ -312,8 +312,20 @@ def _extract_express_profile_link(payload: dict[str, Any]) -> str | None:
 
     user_huid = _first_string(user, ["user_huid", "userHuid", "huid", "id"])
     if user_huid:
-        return f"express://user/{user_huid}"
+        return _build_express_profile_url(user_huid, cts_host)
     return None
+
+
+def _build_express_profile_url(user_huid: str, cts_host: str) -> str:
+    if settings.botx_profile_url_template:
+        return settings.botx_profile_url_template.format(user_huid=user_huid)
+
+    host = (cts_host or settings.botx_base_url).strip().rstrip("/")
+    if host and not host.startswith(("http://", "https://")):
+        host = f"https://{host}"
+    if not host:
+        return user_huid
+    return f"{host}/profile/{user_huid}"
 
 
 def _extract_user_payload(payload: dict[str, Any]) -> dict[str, Any]:

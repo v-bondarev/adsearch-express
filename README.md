@@ -9,7 +9,7 @@
 - При первом открытии, `/start`, `start`, `старт`, `/help`, `help` или `помощь` бот показывает памятку: `Для поиска введите ФИО или просто фамилию`.
 - Поиск по ФИО, имени, фамилии и части фамилии.
 - Поиск ограничен полями имени в AD, чтобы не находить сотрудников по компании, описанию, почте или логину.
-- В выдачу попадают только записи с заполненными подразделением и e-mail.
+- В выдачу попадают только записи с заполненными компанией и e-mail.
 - Поиск выполняется по пользователям и контактам внутри настроенных LDAP OU с учетом вложенных контейнеров.
 - Выдача до 5 результатов с предложением уточнить запрос при большом количестве совпадений.
 - Бот отправляет заголовок `Найдены сотрудники:`, затем отдельное сообщение-карточку для каждого сотрудника.
@@ -62,7 +62,7 @@ curl http://127.0.0.1:${APP_PORT:-8181}/health
 
 Webhook express.ms обрабатывается на `/command` и совместимом `/webhook`. Для исходящих сообщений используется BotX API v4 endpoint `/api/v4/botx/notifications/direct/sync` и старый JWT-токен бота.
 
-## Пример `.env` для HCI AD
+## Пример `.env` для AD
 
 ```env
 APP_PORT=8181
@@ -71,19 +71,20 @@ BOT_ID=<uuid бота>
 BOT_SECRET_KEY=<secret_key бота>
 BOTX_PROTOCOL_VERSION=4
 BOTX_BASE_URL=<адрес CTS/BotX>
+BOTX_PROFILE_URL_TEMPLATE=https://express.example.com/profile/{user_huid}
 
-LDAP_HOST=172.22.10.100
+LDAP_HOST=10.0.0.10
 LDAP_PORT=636
 LDAP_USE_SSL=true
-LDAP_BIND_USER=EXP_account
+LDAP_BIND_USER=svc_directory_bot
 LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap_bind_password
 LDAP_BIND_PASSWORD_FILE_HOST=/etc/adsearch-express/ldap_bind_password
-LDAP_BASE_DN=DC=hci,DC=interros,DC=ru
-LDAP_INCLUDED_OUS=OU=HCI,DC=hci,DC=interros,DC=ru;OU=HCI_Users,DC=hci,DC=interros,DC=ru
+LDAP_BASE_DN=DC=example,DC=local
+LDAP_INCLUDED_OUS=OU=Employees,DC=example,DC=local;OU=Contacts,DC=example,DC=local
 LDAP_EXCLUDED_OUS=
 ```
 
-`LDAP_INCLUDED_OUS` задает верхние OU для поиска. Вложенные контейнеры внутри `HCI` и `HCI_Users` перечислять не нужно: поиск идет рекурсивно.
+`LDAP_INCLUDED_OUS` задает верхние OU для поиска. Вложенные контейнеры внутри этих OU перечислять не нужно: поиск идет рекурсивно.
 
 ## Обновление на VM
 

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     bot_secret_key: str = ""
     botx_base_url: str = ""
     botx_protocol_version: int = 4
+    botx_profile_url_template: str = ""
     bot_admin_huids: str = ""
     bot_admin_alert_chat_ids: str = ""
 

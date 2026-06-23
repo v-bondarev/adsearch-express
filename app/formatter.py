@@ -68,5 +68,5 @@ def _format_person_fields(person: SearchResult | EmployeeCard, prefix: str = "")
         if value:
             lines.append(f"{label}: {value}")
     if person.express_chat_url:
-        lines.append(f"💬 [Написать в eXpress]({person.express_chat_url})")
+        lines.append(f"💬 Написать в eXpress: {person.express_chat_url}")
     return lines

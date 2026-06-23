@@ -142,7 +142,7 @@ class LdapClient:
 def _build_people_filter(query: str) -> str:
     name_filter = _build_name_filter(query)
     enabled_user_filter = "(!(userAccountControl:1.2.840.113556.1.4.803:=2))"
-    required_card_fields_filter = "(department=*)(mail=*)"
+    required_card_fields_filter = "(company=*)(mail=*)"
 
     user_match = (
         "(&"
@@ -181,6 +181,7 @@ def _build_name_token_filter(token: str) -> str:
         f"(displayName={contains})"
         f"(cn={contains})"
         f"(name={contains})"
+        f"(givenName={starts_with})"
         f"(extensionAttribute1={starts_with})"
         f"(extensionAttribute2={starts_with})"
         f"(extensionAttribute3={starts_with})"
