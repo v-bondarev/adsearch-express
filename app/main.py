@@ -50,11 +50,12 @@ async def _handle_command(request: Request) -> dict[str, Any]:
     logger.info("BotX command received")
 
     command = _extract_text(body)
+    normalized_command = command.casefold()
     user_huid = _extract_user_huid(body)
     chat_id = _extract_group_chat_id(body)
     cts_host = _extract_cts_host(body)
 
-    if command == "/clear_cache":
+    if normalized_command == "/clear_cache":
         if user_huid not in settings.admin_huids:
             logger.warning("cache clear denied")
             message = "Команда доступна только администраторам бота."
@@ -66,8 +67,8 @@ async def _handle_command(request: Request) -> dict[str, Any]:
         sent = await _send_botx_message(chat_id, cts_host, message)
         return {"status": "ok", "message": message, "sent": sent}
 
-    if command in {"/start", "/help", ""}:
-        message = "Напишите ФИО или часть ФИО сотрудника для поиска."
+    if normalized_command in {"", "/start", "start", "старт", "/help", "help", "помощь"}:
+        message = "Для поиска введите ФИО или просто фамилию"
         sent = await _send_botx_message(chat_id, cts_host, message)
         return {"status": "ok", "message": message, "sent": sent}
 
