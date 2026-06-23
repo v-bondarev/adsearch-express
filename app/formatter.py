@@ -7,12 +7,16 @@ def format_search_results(results: list[SearchResult], limit: int) -> str:
 
     lines = ["Найдены сотрудники:"]
     for index, result in enumerate(results[:limit], start=1):
-        parts = [result.display_name]
+        lines.append(f"{index}. {result.display_name}")
+        parts = []
         if result.title:
-            parts.append(result.title)
+            parts.append(f"Должность: {result.title}")
         if result.department:
-            parts.append(result.department)
-        lines.append(f"{index}. " + " | ".join(parts))
+            parts.append(f"Подразделение: {result.department}")
+        if result.company:
+            parts.append(f"Компания: {result.company}")
+        for part in parts:
+            lines.append(f"   {part}")
 
     if len(results) > limit:
         lines.append("Найдено слишком много совпадений. Напишите новый запрос с более полными данными.")

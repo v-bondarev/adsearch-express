@@ -182,12 +182,11 @@ def _build_people_filter(query: str) -> str:
 
 def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchResult:
     card = _entry_to_employee_card(attributes, dn)
-    department = card.department or _first_value(attributes, "company")
     return SearchResult(
         object_id=dn,
         display_name=card.display_name,
         title=card.title,
-        department=department or card.company,
+        department=card.department,
         company=card.company,
         object_type=card.object_type,
     )
