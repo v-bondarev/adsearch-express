@@ -233,14 +233,25 @@ def _query_filter(query: str | None) -> str:
         return "(|(&(objectClass=user)(objectCategory=person))(objectClass=contact))"
 
     escaped = escape_filter_chars(query.strip())
+    contains = f"*{escaped}*"
+    starts_with = f"{escaped}*"
     return (
         "(|"
+        f"(&(objectClass=user)(objectCategory=person)(displayName={contains}))"
+        f"(&(objectClass=contact)(displayName={contains}))"
+        f"(&(objectClass=user)(objectCategory=person)(cn={contains}))"
+        f"(&(objectClass=contact)(cn={contains}))"
+        f"(&(objectClass=user)(objectCategory=person)(name={contains}))"
+        f"(&(objectClass=contact)(name={contains}))"
+        f"(&(objectClass=user)(objectCategory=person)(mail={contains}))"
+        f"(&(objectClass=contact)(mail={contains}))"
+        f"(&(objectClass=user)(objectCategory=person)(sAMAccountName={contains}))"
         f"(&(objectClass=user)(objectCategory=person)(displayName={escaped}))"
         f"(&(objectClass=contact)(displayName={escaped}))"
         f"(&(objectClass=user)(objectCategory=person)(cn={escaped}))"
         f"(&(objectClass=contact)(cn={escaped}))"
-        f"(&(objectClass=user)(objectCategory=person)(sn={escaped}*))"
-        f"(&(objectClass=contact)(sn={escaped}*))"
+        f"(&(objectClass=user)(objectCategory=person)(sn={starts_with}))"
+        f"(&(objectClass=contact)(sn={starts_with}))"
         ")"
     )
 

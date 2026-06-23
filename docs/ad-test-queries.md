@@ -66,6 +66,15 @@ docker compose run --rm bot python scripts/ldap_test_queries.py \
   --all-attributes
 ```
 
+Если сотрудник точно есть, но поиск не находит его, проверьте широкое совпадение по основным name/email/account-полям:
+
+```bash
+docker compose run --rm bot python scripts/ldap_test_queries.py \
+  --query "Иванова" \
+  --all-attributes \
+  --limit 10
+```
+
 Скрипт не печатает пароль bind-пользователя. Бинарные атрибуты `objectGUID`, `thumbnailPhoto` и `jpegPhoto` выводятся только как краткое описание размера.
 
 ### Частые ошибки
