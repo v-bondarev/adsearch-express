@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ldap3 import ALL, ALL_ATTRIBUTES, BASE, SUBTREE, Connection, Server, Tls
-from ldap3.core.exceptions import LDAPException, LDAPSASLPrepError
+from ldap3.core.exceptions import LDAPAttributeError, LDAPException, LDAPSASLPrepError
 from ldap3.utils.conv import escape_filter_chars
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -169,12 +169,25 @@ def _password_source(settings: Settings) -> str:
 
 def _print_root_dse(connection: Connection) -> dict[str, Any]:
     print("\n== RootDSE")
-    connection.search(
-        search_base="",
-        search_filter="(objectClass=*)",
-        search_scope=BASE,
-        attributes=["defaultNamingContext", "namingContexts", "supportedLDAPVersion"],
-    )
+    root_dse_attributes = [
+        ["defaultNamingContext", "namingContexts", "supportedLDAPVersion"],
+        ["namingContexts", "supportedLDAPVersion"],
+        ["*"],
+    ]
+    for attributes in root_dse_attributes:
+        try:
+            connection.search(
+                search_base="",
+                search_filter="(objectClass=*)",
+                search_scope=BASE,
+                attributes=attributes,
+            )
+            break
+        except LDAPAttributeError as exc:
+            print(f"RootDSE attribute set {attributes} failed: {exc}")
+    else:
+        raise SystemExit("ERROR: cannot read RootDSE attributes.")
+
     root_dse: dict[str, Any] = {}
     for entry in connection.entries:
         root_dse = _sanitize_entry(entry.entry_attributes_as_dict)
