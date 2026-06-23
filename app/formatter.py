@@ -63,9 +63,10 @@ def _format_person_fields(person: SearchResult | EmployeeCard, prefix: str = "")
         ("🚪 Кабинет", person.room),
         ("🏢 Офис", person.office),
         ("👤 Руководитель", person.manager),
-        ("💬 Ссылка на чат в eXpress", person.express_chat_url),
     ]
     for label, value in optional_fields:
         if value:
             lines.append(f"{label}: {value}")
+    if person.express_chat_url:
+        lines.append(f"💬 [Написать в eXpress]({person.express_chat_url})")
     return lines
