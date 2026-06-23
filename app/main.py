@@ -56,6 +56,7 @@ async def _handle_command(request: Request) -> dict[str, Any]:
     command = _extract_text(body)
     normalized_command = command.casefold()
     user_huid = _extract_user_huid(body)
+    user_display_name = _extract_user_display_name(body)
     chat_id = _extract_group_chat_id(body)
     cts_host = _extract_cts_host(body)
 
@@ -78,7 +79,13 @@ async def _handle_command(request: Request) -> dict[str, Any]:
 
     if RESTRICTED_QUERY in _command_tokens(normalized_command):
         sent = await _send_botx_message(chat_id, cts_host, RESTRICTED_MESSAGE)
-        admin_sent = await _notify_admins_about_restricted_query(chat_id, cts_host, user_huid, command)
+        admin_sent = await _notify_admins_about_restricted_query(
+            chat_id,
+            cts_host,
+            user_display_name,
+            user_huid,
+            command,
+        )
         return {"status": "ok", "message": RESTRICTED_MESSAGE, "sent": sent, "admin_sent": admin_sent}
 
     results = ldap_client.search_people(command)
@@ -120,6 +127,57 @@ def _extract_user_huid(body: dict[str, Any]) -> str:
     for candidate in candidates:
         if isinstance(candidate, str):
             return candidate.strip()
+    return ""
+
+
+def _extract_user_display_name(body: dict[str, Any]) -> str:
+    sender = body.get("from") if isinstance(body.get("from"), dict) else {}
+    nested_sources = [
+        sender,
+        body.get("sender") if isinstance(body.get("sender"), dict) else {},
+        body.get("user") if isinstance(body.get("user"), dict) else {},
+        sender.get("user") if isinstance(sender.get("user"), dict) else {},
+        sender.get("profile") if isinstance(sender.get("profile"), dict) else {},
+    ]
+
+    for source in nested_sources:
+        display_name = _first_string(
+            source,
+            [
+                "display_name",
+                "displayName",
+                "full_name",
+                "fullName",
+                "name",
+                "user_name",
+                "userName",
+                "username",
+                "login",
+            ],
+        )
+        if display_name:
+            return display_name
+
+        full_name = " ".join(
+            part
+            for part in [
+                _first_string(source, ["last_name", "lastName", "surname"]),
+                _first_string(source, ["first_name", "firstName", "given_name", "givenName"]),
+                _first_string(source, ["middle_name", "middleName", "patronymic"]),
+            ]
+            if part
+        )
+        if full_name:
+            return full_name
+
+    return ""
+
+
+def _first_string(source: dict[str, Any], keys: list[str]) -> str:
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
     return ""
 
 
@@ -171,25 +229,25 @@ async def _send_botx_messages(chat_id: str, cts_host: str, messages: list[str]) 
 async def _notify_admins_about_restricted_query(
     chat_id: str,
     cts_host: str,
+    user_display_name: str,
     user_huid: str,
     query: str,
 ) -> bool:
     if not settings.admin_huids:
         logger.warning("Restricted query admin notification skipped: BOT_ADMIN_HUIDS is empty")
         return False
-    if not chat_id:
-        logger.warning("Restricted query admin notification skipped: group_chat_id is empty")
-        return False
 
-    user_label = user_huid or "<unknown>"
+    user_label = user_display_name or "<имя не передано eXpress>"
+    huid_label = user_huid or "<unknown>"
     message = (
         "💀 Запрос ограниченной информации\n"
         f"Пользователь: {user_label}\n"
+        f"HUID: {huid_label}\n"
         f"Чат: {chat_id}\n"
         f"Запрос: {query}"
     )
     return await BotxClient(settings, cts_host).send_text(
-        chat_id,
+        "",
         message,
         recipients=sorted(settings.admin_huids),
     )
