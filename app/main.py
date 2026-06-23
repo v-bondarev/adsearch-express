@@ -1,4 +1,5 @@
 import logging
+import re
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -15,6 +16,9 @@ from app.logging_config import configure_logging
 settings = get_settings()
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
+
+RESTRICTED_QUERY = "потанин"
+RESTRICTED_MESSAGE = "💀 Доступ к данной информации ограничен"
 
 
 @asynccontextmanager
@@ -72,6 +76,11 @@ async def _handle_command(request: Request) -> dict[str, Any]:
         sent = await _send_botx_message(chat_id, cts_host, message)
         return {"status": "ok", "message": message, "sent": sent}
 
+    if RESTRICTED_QUERY in _command_tokens(normalized_command):
+        sent = await _send_botx_message(chat_id, cts_host, RESTRICTED_MESSAGE)
+        admin_sent = await _notify_admins_about_restricted_query(chat_id, cts_host, user_huid, command)
+        return {"status": "ok", "message": RESTRICTED_MESSAGE, "sent": sent, "admin_sent": admin_sent}
+
     results = ldap_client.search_people(command)
     message = format_search_results(results, settings.search_limit)
     sent = await _send_botx_messages(
@@ -95,6 +104,10 @@ def _extract_text(body: dict[str, Any]) -> str:
         if isinstance(candidate, str):
             return candidate.strip()
     return ""
+
+
+def _command_tokens(command: str) -> set[str]:
+    return set(re.findall(r"\w+", command, flags=re.UNICODE))
 
 
 def _extract_user_huid(body: dict[str, Any]) -> str:
@@ -153,3 +166,30 @@ async def _send_botx_messages(chat_id: str, cts_host: str, messages: list[str]) 
     for message in messages:
         sent_results.append(await client.send_text(chat_id, message))
     return all(sent_results)
+
+
+async def _notify_admins_about_restricted_query(
+    chat_id: str,
+    cts_host: str,
+    user_huid: str,
+    query: str,
+) -> bool:
+    if not settings.admin_huids:
+        logger.warning("Restricted query admin notification skipped: BOT_ADMIN_HUIDS is empty")
+        return False
+    if not chat_id:
+        logger.warning("Restricted query admin notification skipped: group_chat_id is empty")
+        return False
+
+    user_label = user_huid or "<unknown>"
+    message = (
+        "💀 Запрос ограниченной информации\n"
+        f"Пользователь: {user_label}\n"
+        f"Чат: {chat_id}\n"
+        f"Запрос: {query}"
+    )
+    return await BotxClient(settings, cts_host).send_text(
+        chat_id,
+        message,
+        recipients=sorted(settings.admin_huids),
+    )
