@@ -8,7 +8,7 @@ from app.botx_client import BotxClient
 from app.cache import CardCache
 from app.config import get_settings
 from app.db import init_db
-from app.formatter import format_search_results
+from app.formatter import format_search_messages, format_search_results
 from app.ldap_client import LdapClient
 from app.logging_config import configure_logging
 
@@ -73,7 +73,11 @@ async def _handle_command(request: Request) -> dict[str, Any]:
 
     results = ldap_client.search_people(command)
     message = format_search_results(results, settings.search_limit)
-    sent = await _send_botx_message(chat_id, cts_host, message)
+    sent = await _send_botx_messages(
+        chat_id,
+        cts_host,
+        format_search_messages(results, settings.search_limit),
+    )
     return {"status": "ok", "message": message, "sent": sent}
 
 
@@ -136,3 +140,15 @@ async def _send_botx_message(chat_id: str, cts_host: str, message: str) -> bool:
         logger.info("BotX send skipped: group_chat_id is empty")
         return False
     return await BotxClient(settings, cts_host).send_text(chat_id, message)
+
+
+async def _send_botx_messages(chat_id: str, cts_host: str, messages: list[str]) -> bool:
+    if not chat_id:
+        logger.info("BotX send skipped: group_chat_id is empty")
+        return False
+
+    client = BotxClient(settings, cts_host)
+    sent_results = []
+    for message in messages:
+        sent_results.append(await client.send_text(chat_id, message))
+    return all(sent_results)

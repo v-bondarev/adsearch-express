@@ -1,20 +1,45 @@
 from app.models import EmployeeCard, SearchResult
 
+NOT_FOUND_MESSAGE = "Сотрудник не найден. Попробуйте уточнить ФИО."
+SEARCH_HEADER = "Найдены сотрудники:"
+TOO_MANY_RESULTS_MESSAGE = "Найдено слишком много совпадений. Напишите новый запрос с более полными данными."
+
 
 def format_search_results(results: list[SearchResult], limit: int) -> str:
     if not results:
-        return "Сотрудник не найден. Попробуйте уточнить ФИО."
+        return NOT_FOUND_MESSAGE
 
-    lines = ["Найдены сотрудники:"]
+    lines = [SEARCH_HEADER]
     for index, result in enumerate(results[:limit], start=1):
         if index > 1:
             lines.append("")
-        lines.extend(_format_person_fields(result, prefix=f"{index}. "))
+        lines.append(format_search_result_card(result, index=index))
 
     if len(results) > limit:
-        lines.append("Найдено слишком много совпадений. Напишите новый запрос с более полными данными.")
+        lines.append(TOO_MANY_RESULTS_MESSAGE)
 
     return "\n".join(lines)
+
+
+def format_search_messages(results: list[SearchResult], limit: int) -> list[str]:
+    if not results:
+        return [NOT_FOUND_MESSAGE]
+
+    messages = [SEARCH_HEADER]
+    messages.extend(
+        format_search_result_card(result, index=index)
+        for index, result in enumerate(results[:limit], start=1)
+    )
+
+    if len(results) > limit:
+        messages.append(TOO_MANY_RESULTS_MESSAGE)
+
+    return messages
+
+
+def format_search_result_card(result: SearchResult, index: int | None = None) -> str:
+    prefix = f"{index}. " if index is not None else ""
+    return "\n".join(_format_person_fields(result, prefix=prefix))
 
 
 def format_employee_card(card: EmployeeCard) -> str:
