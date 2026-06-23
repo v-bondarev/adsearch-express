@@ -140,16 +140,43 @@ class LdapClient:
 
 
 def _build_people_filter(query: str) -> str:
-    escaped = escape_filter_chars(query)
-    contains = f"*{escaped}*"
-    starts_with = f"{escaped}*"
+    name_filter = _build_name_filter(query)
     enabled_user_filter = "(!(userAccountControl:1.2.840.113556.1.4.803:=2))"
+    required_card_fields_filter = "(department=*)(mail=*)"
 
     user_match = (
         "(&"
         "(objectClass=user)"
         "(objectCategory=person)"
         f"{enabled_user_filter}"
+        f"{required_card_fields_filter}"
+        f"{name_filter}"
+        ")"
+    )
+    contact_match = (
+        "(&"
+        "(objectClass=contact)"
+        f"{required_card_fields_filter}"
+        f"{name_filter}"
+        ")"
+    )
+    return f"(|{user_match}{contact_match})"
+
+
+def _build_name_filter(query: str) -> str:
+    token_filters = [_build_name_token_filter(token) for token in query.split() if token]
+    if not token_filters:
+        return "(cn=__empty_query__)"
+    if len(token_filters) == 1:
+        return token_filters[0]
+    return f"(&{''.join(token_filters)})"
+
+
+def _build_name_token_filter(token: str) -> str:
+    escaped = escape_filter_chars(token)
+    contains = f"*{escaped}*"
+    starts_with = f"{escaped}*"
+    return (
         "(|"
         f"(displayName={contains})"
         f"(cn={contains})"
@@ -159,20 +186,7 @@ def _build_people_filter(query: str) -> str:
         f"(extensionAttribute3={starts_with})"
         f"(sn={starts_with})"
         ")"
-        ")"
     )
-    contact_match = (
-        "(&"
-        "(objectClass=contact)"
-        "(|"
-        f"(displayName={contains})"
-        f"(cn={contains})"
-        f"(name={contains})"
-        f"(sn={starts_with})"
-        ")"
-        ")"
-    )
-    return f"(|{user_match}{contact_match})"
 
 
 def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchResult:
