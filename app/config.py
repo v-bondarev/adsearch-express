@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -59,6 +60,20 @@ class Settings(BaseSettings):
         if self.ldap_bind_password_file:
             return self.ldap_bind_password_file.read_text(encoding="utf-8").strip()
         return self.ldap_bind_password
+
+    @property
+    def ldap_password_diagnostics(self) -> dict[str, Any]:
+        password = self.ldap_password
+        control_chars = [
+            {"position": index, "codepoint": ord(char)}
+            for index, char in enumerate(password)
+            if ord(char) < 32 or ord(char) == 127
+        ]
+        return {
+            "length": len(password),
+            "has_control_chars": bool(control_chars),
+            "control_chars": control_chars,
+        }
 
 
 @lru_cache

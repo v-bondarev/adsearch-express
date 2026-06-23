@@ -46,6 +46,23 @@ docker compose run --rm bot python scripts/ldap_test_queries.py \
 
 Скрипт не печатает пароль bind-пользователя. Бинарные атрибуты `objectGUID`, `thumbnailPhoto` и `jpegPhoto` выводятся только как краткое описание размера.
 
+### Частые ошибки
+
+Если скрипт пишет `LDAP password contains ASCII control characters` или `SASLprep error: ASCII control character present`, в файле пароля есть невидимый управляющий символ. Перезапишите файл одной строкой:
+
+```bash
+sudoedit /etc/adsearch-express/ldap_bind_password
+```
+
+В файле должен быть только пароль, без пустых строк до/после и без вставленных управляющих символов. Обычный перевод строки в конце файла допустим: приложение его срезает.
+
+Если в summary видно `base_dn:` пустой и `included_ous: <none>`, заполните в `.env` минимум один из параметров:
+
+```dotenv
+LDAP_BASE_DN=DC=example,DC=local
+LDAP_INCLUDED_OUS=OU=Users,DC=example,DC=local
+```
+
 Команды ниже не содержат секретов. Значения в угловых скобках нужно заменить на реальные параметры окружения.
 
 ## Переменные

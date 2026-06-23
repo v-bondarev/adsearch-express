@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from ldap3 import ALL, ALL_ATTRIBUTES, BASE, SUBTREE, Connection, Server, Tls
+from ldap3.core.exceptions import LDAPException, LDAPSASLPrepError
 from ldap3.utils.conv import escape_filter_chars
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -49,8 +50,20 @@ def main() -> int:
 
     settings = Settings()
     _print_settings_summary(settings)
+    _validate_settings(settings)
 
-    connection = _connection(settings)
+    try:
+        connection = _connection(settings)
+    except LDAPSASLPrepError as exc:
+        print("\nERROR: LDAP password contains an ASCII control character.")
+        print("Rewrite LDAP_BIND_PASSWORD_FILE as a single-line text file without hidden characters.")
+        print(f"password_diagnostics: {settings.ldap_password_diagnostics}")
+        print(f"ldap3_error: {exc}")
+        return 2
+    except LDAPException as exc:
+        print(f"\nERROR: LDAP bind/connect failed: {type(exc).__name__}: {exc}")
+        return 2
+
     try:
         _print_root_dse(connection)
         ldap_filter = args.filter or _query_filter(args.query)
@@ -74,6 +87,31 @@ def main() -> int:
         connection.unbind()
 
     return 0
+
+
+def _validate_settings(settings: Settings) -> None:
+    missing = []
+    if not settings.ldap_host:
+        missing.append("LDAP_HOST")
+    if not settings.ldap_bind_user:
+        missing.append("LDAP_BIND_USER")
+    if not settings.ldap_password:
+        missing.append("LDAP_BIND_PASSWORD or LDAP_BIND_PASSWORD_FILE")
+    if not settings.ldap_base_dn and not settings.included_ous:
+        missing.append("LDAP_BASE_DN or LDAP_INCLUDED_OUS")
+
+    diagnostics = settings.ldap_password_diagnostics
+    if diagnostics["has_control_chars"]:
+        print("\nERROR: LDAP password contains ASCII control characters.")
+        print("The password value itself is not printed; only length and positions are shown.")
+        print(f"password_diagnostics: {diagnostics}")
+        raise SystemExit(2)
+
+    if missing:
+        print("\nERROR: missing required LDAP settings:")
+        for name in missing:
+            print(f"- {name}")
+        raise SystemExit(2)
 
 
 def _connection(settings: Settings) -> Connection:
