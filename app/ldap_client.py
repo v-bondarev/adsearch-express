@@ -203,6 +203,7 @@ def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchRes
         office=card.office,
         room=card.room,
         manager=card.manager,
+        photo=card.photo,
         object_type=card.object_type,
     )
 

@@ -14,6 +14,7 @@ class SearchResult:
     room: str | None = None
     manager: str | None = None
     express_chat_url: str | None = None
+    photo: bytes | None = None
     object_type: str | None = None
 
 

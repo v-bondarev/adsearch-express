@@ -86,6 +86,30 @@ class BotxClient:
         }
         return await self._post(payload)
 
+    async def send_file(
+        self,
+        chat_id: str,
+        file_bytes: bytes,
+        file_name: str,
+        mime_type: str,
+        caption: str = "",
+        recipients: list[str] | None = None,
+    ) -> bool:
+        data = base64.b64encode(file_bytes).decode("ascii")
+        payload: dict[str, Any] = {
+            "group_chat_id": chat_id,
+            "recipients": recipients,
+            "notification": {
+                "status": "ok",
+                "body": caption,
+            },
+            "file": {
+                "file_name": file_name,
+                "data": f"data:{mime_type};base64,{data}",
+            },
+        }
+        return await self._post(payload)
+
     async def get_user_by_email(self, email: str) -> dict[str, Any] | None:
         if not email:
             return None

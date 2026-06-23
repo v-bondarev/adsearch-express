@@ -10,7 +10,13 @@ from app.botx_client import BotxClient
 from app.cache import CardCache
 from app.config import get_settings
 from app.db import init_db
-from app.formatter import format_search_messages, format_search_results
+from app.formatter import (
+    NOT_FOUND_MESSAGE,
+    SEARCH_HEADER,
+    TOO_MANY_RESULTS_MESSAGE,
+    format_search_result_card,
+    format_search_results,
+)
 from app.ldap_client import LdapClient
 from app.logging_config import configure_logging
 from app.models import SearchResult
@@ -92,11 +98,7 @@ async def _handle_command(request: Request) -> dict[str, Any]:
 
     results = await _enrich_results_with_express_links(ldap_client.search_people(command), cts_host)
     message = format_search_results(results, settings.search_limit)
-    sent = await _send_botx_messages(
-        chat_id,
-        cts_host,
-        format_search_messages(results, settings.search_limit),
-    )
+    sent = await _send_search_results(chat_id, cts_host, results)
     return {"status": "ok", "message": message, "sent": sent}
 
 
@@ -226,6 +228,59 @@ async def _send_botx_messages(chat_id: str, cts_host: str, messages: list[str]) 
     for message in messages:
         sent_results.append(await client.send_text(chat_id, message))
     return all(sent_results)
+
+
+async def _send_search_results(chat_id: str, cts_host: str, results: list[SearchResult]) -> bool:
+    if not chat_id:
+        logger.info("BotX send skipped: group_chat_id is empty")
+        return False
+    if not results:
+        return await _send_botx_message(chat_id, cts_host, NOT_FOUND_MESSAGE)
+
+    client = BotxClient(settings, cts_host)
+    sent_results = [await client.send_text(chat_id, SEARCH_HEADER)]
+    for index, result in enumerate(results[: settings.search_limit], start=1):
+        sent_results.append(await _send_search_result_card(client, chat_id, result, index))
+
+    if len(results) > settings.search_limit:
+        sent_results.append(await client.send_text(chat_id, TOO_MANY_RESULTS_MESSAGE))
+
+    return all(sent_results)
+
+
+async def _send_search_result_card(client: BotxClient, chat_id: str, result: SearchResult, index: int) -> bool:
+    caption = format_search_result_card(result, index=index)
+    if result.photo:
+        return await client.send_file(
+            chat_id,
+            result.photo,
+            file_name=f"{_photo_file_stem(result, index)}.{_photo_extension(result.photo)}",
+            mime_type=_photo_mime_type(result.photo),
+            caption=caption,
+        )
+    return await client.send_text(chat_id, caption)
+
+
+def _photo_file_stem(result: SearchResult, index: int) -> str:
+    normalized_name = re.sub(r"[^0-9A-Za-zА-Яа-яЁё_-]+", "-", result.display_name).strip("-")
+    return normalized_name or f"employee-{index}"
+
+
+def _photo_mime_type(photo: bytes) -> str:
+    if photo.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if photo.startswith(b"GIF87a") or photo.startswith(b"GIF89a"):
+        return "image/gif"
+    return "image/jpeg"
+
+
+def _photo_extension(photo: bytes) -> str:
+    mime_type = _photo_mime_type(photo)
+    if mime_type == "image/png":
+        return "png"
+    if mime_type == "image/gif":
+        return "gif"
+    return "jpg"
 
 
 async def _notify_admins_about_restricted_query(
