@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import base64
 import hashlib
@@ -5,7 +7,7 @@ import hmac
 import json
 import time
 import uuid
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -14,6 +16,9 @@ from app.config import Settings
 logger = logging.getLogger(__name__)
 
 JWT_TOKEN_VERSION = 2
+
+# Global HTTP client for connection reuse
+_http_client: Optional[httpx.AsyncClient] = None
 
 
 def _base64url(data: bytes) -> str:
@@ -57,6 +62,24 @@ def _make_token(settings: Settings, cts_host: str) -> str:
     return f"{signing_input}.{_base64url(signature)}"
 
 
+def get_http_client() -> httpx.AsyncClient:
+    """Get or create the global HTTP client."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=15.0)
+    return _http_client
+
+
+async def close_http_client() -> None:
+    """Close the global HTTP client. Call on application shutdown."""
+    global _http_client
+    if _http_client is not None:
+        # Cancel any pending requests
+        await _http_client.aclose()
+        _http_client = None
+        logger.info("HTTP client closed")
+
+
 class BotxClient:
     def __init__(self, settings: Settings, cts_host: str) -> None:
         self.settings = settings
@@ -64,8 +87,8 @@ class BotxClient:
         self.endpoint = f"{self.host}/api/v4/botx/notifications/direct/sync"
         self.users_by_email_endpoint = f"{self.host}/api/v3/botx/users/by_email"
 
-    async def send_text(self, chat_id: str, text: str, recipients: list[str] | None = None) -> bool:
-        payload: dict[str, Any] = {
+    async def send_text(self, chat_id: str, text: str, recipients: Optional[List[str]] = None) -> bool:
+        payload: Dict[str, Any] = {
             "group_chat_id": chat_id,
             "recipients": recipients,
             "notification": {
@@ -75,8 +98,8 @@ class BotxClient:
         }
         return await self._post(payload)
 
-    async def send_error(self, chat_id: str, text: str, recipients: list[str] | None = None) -> bool:
-        payload: dict[str, Any] = {
+    async def send_error(self, chat_id: str, text: str, recipients: Optional[List[str]] = None) -> bool:
+        payload: Dict[str, Any] = {
             "group_chat_id": chat_id,
             "recipients": recipients,
             "notification": {
@@ -93,10 +116,10 @@ class BotxClient:
         file_name: str,
         mime_type: str,
         caption: str = "",
-        recipients: list[str] | None = None,
+        recipients: Optional[List[str]] = None,
     ) -> bool:
         data = base64.b64encode(file_bytes).decode("ascii")
-        payload: dict[str, Any] = {
+        payload: Dict[str, Any] = {
             "group_chat_id": chat_id,
             "recipients": recipients,
             "notification": {
@@ -110,7 +133,7 @@ class BotxClient:
         }
         return await self._post(payload)
 
-    async def get_user_by_email(self, email: str) -> dict[str, Any] | None:
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         if not email:
             return None
 
@@ -139,7 +162,7 @@ class BotxClient:
         logger.error("BotX user by email returned unexpected payload type")
         return None
 
-    async def _post(self, payload: dict[str, Any]) -> bool:
+    async def _post(self, payload: Dict[str, Any]) -> bool:
         response = await self._request("POST", self.endpoint, json_payload=payload)
         if response is None:
             return False
@@ -154,9 +177,9 @@ class BotxClient:
         method: str,
         url: str,
         *,
-        params: dict[str, Any] | None = None,
-        json_payload: dict[str, Any] | None = None,
-    ) -> httpx.Response | None:
+        params: Optional[Dict[str, Any]] = None,
+        json_payload: Optional[Dict[str, Any]] = None,
+    ) -> Optional[httpx.Response]:
         if not self.host:
             logger.error("BotX request skipped: host is not configured")
             return None
@@ -168,22 +191,18 @@ class BotxClient:
             "Authorization": f"Bearer {_make_token(self.settings, self.host)}",
             "Content-Type": "application/json",
         }
-        async with create_http_client() as client:
-            try:
-                return await client.request(
-                    method,
-                    url,
-                    params=params,
-                    json=json_payload,
-                    headers=headers,
-                )
-            except httpx.RequestError as exc:
-                logger.error("BotX network error: %s", exc)
-                return None
+        try:
+            client = get_http_client()
+            return await client.request(
+                method,
+                url,
+                params=params,
+                json=json_payload,
+                headers=headers,
+            )
+        except httpx.RequestError as exc:
+            logger.error("BotX network error: %s", exc)
+            return None
 
     async def close(self) -> None:
         pass
-
-
-def create_http_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=15)

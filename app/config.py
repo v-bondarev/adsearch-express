@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Set
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,7 +28,7 @@ class Settings(BaseSettings):
     ldap_use_ssl: bool = True
     ldap_bind_user: str = ""
     ldap_bind_password: str = ""
-    ldap_bind_password_file: Path | None = None
+    ldap_bind_password_file: Optional[Path] = None
     ldap_base_dn: str = ""
     ldap_included_ous: str = ""
     ldap_excluded_ous: str = ""
@@ -39,19 +41,19 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 86400
 
     @property
-    def admin_huids(self) -> set[str]:
+    def admin_huids(self) -> Set[str]:
         return {item.strip() for item in self.bot_admin_huids.split(",") if item.strip()}
 
     @property
-    def admin_alert_chat_ids(self) -> list[str]:
+    def admin_alert_chat_ids(self) -> List[str]:
         return [item.strip() for item in self.bot_admin_alert_chat_ids.split(",") if item.strip()]
 
     @property
-    def included_ous(self) -> list[str]:
+    def included_ous(self) -> List[str]:
         return [item.strip() for item in self.ldap_included_ous.split(";") if item.strip()]
 
     @property
-    def excluded_ous(self) -> list[str]:
+    def excluded_ous(self) -> List[str]:
         return [item.strip() for item in self.ldap_excluded_ous.split(";") if item.strip()]
 
     @field_validator("ldap_bind_password_file", mode="before")
@@ -68,7 +70,7 @@ class Settings(BaseSettings):
         return self.ldap_bind_password
 
     @property
-    def ldap_password_diagnostics(self) -> dict[str, Any]:
+    def ldap_password_diagnostics(self) -> Dict[str, Any]:
         password = self.ldap_password
         control_chars = [
             {"position": index, "codepoint": ord(char)}
