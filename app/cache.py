@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import base64
 import json
 import time
 from pathlib import Path
+from typing import Optional
 
 from app.db import connect
 from app.models import EmployeeCard
@@ -12,7 +15,7 @@ class CardCache:
         self.db_path = db_path
         self.ttl_seconds = ttl_seconds
 
-    def get(self, object_id: str) -> EmployeeCard | None:
+    def get(self, object_id: str) -> Optional[EmployeeCard]:
         with connect(self.db_path) as connection:
             row = connection.execute(
                 "SELECT payload_json, photo, cached_at FROM employee_card_cache WHERE object_id = ?",

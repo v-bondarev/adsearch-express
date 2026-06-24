@@ -24,12 +24,13 @@
 
 ## Стек
 
-- Python
+- Python 3.8+
 - FastAPI
-- ldap3
-- httpx
+- ldap3 (с connection pooling)
+- httpx (с переиспользованием соединений)
 - SQLite
 - Docker Compose
+- pytest
 
 ## Документы
 
@@ -62,6 +63,40 @@ curl http://127.0.0.1:${APP_PORT:-8181}/health
 
 Webhook express.ms обрабатывается на `/command` и совместимом `/webhook`. Для исходящих сообщений используется BotX API v4 endpoint `/api/v4/botx/notifications/direct/sync` и старый JWT-токен бота.
 
+## Локальная разработка
+
+### Установка зависимостей
+
+```bash
+# Основные зависимости
+pip install -r requirements.txt
+
+# Dev-зависимости (тесты)
+pip install pytest pytest-asyncio pytest-cov
+```
+
+### Запуск тестов
+
+```bash
+# Все тесты
+pytest tests/ -v
+
+# С покрытием
+pytest tests/ -v --cov=app --cov-report=html
+
+# Один файл тестов
+pytest tests/test_ldap_client.py -v
+```
+
+### Структура тестов
+
+- `tests/test_config.py` — тесты конфигурации
+- `tests/test_ldap_client.py` — тесты LDAP клиента и фильтров
+- `tests/test_cache.py` — тесты кэширования
+- `tests/test_formatter.py` — тесты форматирования карточек
+- `tests/test_botx_client.py` — тесты BotX HTTP клиента
+- `tests/test_main.py` — тесты эндпоинтов и обработки команд
+
 ## Пример `.env` для AD
 
 ```env
@@ -93,6 +128,22 @@ cd /opt/adsearch-express
 git pull
 docker compose up --build -d
 ```
+
+## Архитектура
+
+### Connection Pooling
+
+LDAP клиент использует пул соединений (`pool_size=5`, `pool_lifetime=3600`) для эффективного переиспользования соединений с Active Directory.
+
+### HTTP Client Reuse
+
+HTTP клиент (`httpx.AsyncClient`) создаётся один раз и переиспользуется для всех BotX API запросов, что снижает накладные расходы на установку TLS-соединений.
+
+### Graceful Shutdown
+
+При остановке приложения корректно закрываются:
+- LDAP connection pool
+- HTTP клиент
 
 ## Репозиторий
 

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import List, Optional, Union
+
 from app.models import EmployeeCard, SearchResult
 
 NOT_FOUND_MESSAGE = "Сотрудник не найден. Попробуйте уточнить ФИО."
@@ -5,7 +9,7 @@ SEARCH_HEADER = "Найдены сотрудники:"
 TOO_MANY_RESULTS_MESSAGE = "Найдено слишком много совпадений. Напишите новый запрос с более полными данными."
 
 
-def format_search_results(results: list[SearchResult], limit: int) -> str:
+def format_search_results(results: List[SearchResult], limit: int) -> str:
     if not results:
         return NOT_FOUND_MESSAGE
 
@@ -21,7 +25,7 @@ def format_search_results(results: list[SearchResult], limit: int) -> str:
     return "\n".join(lines)
 
 
-def format_search_messages(results: list[SearchResult], limit: int) -> list[str]:
+def format_search_messages(results: List[SearchResult], limit: int) -> List[str]:
     if not results:
         return [NOT_FOUND_MESSAGE]
 
@@ -37,7 +41,7 @@ def format_search_messages(results: list[SearchResult], limit: int) -> list[str]
     return messages
 
 
-def format_search_result_card(result: SearchResult, index: int | None = None) -> str:
+def format_search_result_card(result: SearchResult, index: Optional[int] = None) -> str:
     prefix = f"{index}. " if index is not None else ""
     return "\n".join(_format_person_fields(result, prefix=prefix))
 
@@ -52,7 +56,7 @@ def format_employee_card(card: EmployeeCard) -> str:
     return "\n".join(lines)
 
 
-def _format_person_fields(person: SearchResult | EmployeeCard, prefix: str = "") -> list[str]:
+def _format_person_fields(person: Union[SearchResult, EmployeeCard], prefix: str = "") -> List[str]:
     lines = [f"{prefix}{person.display_name}"]
     optional_fields = [
         ("Должность", person.title),

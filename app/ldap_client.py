@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import logging
 import re
 import ssl
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from ldap3 import ALL, ALL_ATTRIBUTES, BASE, SUBTREE, Connection, Server, Tls
 from ldap3.utils.conv import escape_filter_chars
@@ -38,13 +40,22 @@ SEARCH_ATTRIBUTES = [
     "thumbnailPhoto",
 ]
 
+# Connection pool settings
+POOL_NAME = "adsearch_pool"
+POOL_SIZE = 5
+POOL_LIFETIME = 3600  # seconds
+
 
 class LdapClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self._server: Optional[Server] = None
 
-    @contextmanager
-    def _connection(self) -> Iterator[Connection]:
+    def _get_server(self) -> Server:
+        """Get or create the LDAP server with pooling support."""
+        if self._server is not None:
+            return self._server
+
         tls = None
         if self.settings.ldap_ca_cert_file:
             tls = Tls(
@@ -53,14 +64,23 @@ class LdapClient:
                 version=ssl.PROTOCOL_TLS_CLIENT,
             )
 
-        server = Server(
+        self._server = Server(
             self.settings.ldap_host,
             port=self.settings.ldap_port,
             use_ssl=self.settings.ldap_use_ssl,
             get_info=ALL,
             tls=tls,
             connect_timeout=self.settings.ldap_connect_timeout_seconds,
+            pool_name=POOL_NAME,
+            pool_size=POOL_SIZE,
+            pool_lifetime=POOL_LIFETIME,
         )
+        return self._server
+
+    @contextmanager
+    def _connection(self) -> Iterator[Connection]:
+        """Get a connection from the pool or create a new one."""
+        server = self._get_server()
         connection = Connection(
             server,
             user=self.settings.ldap_bind_user,
@@ -73,6 +93,13 @@ class LdapClient:
         finally:
             connection.unbind()
 
+    def close_pool(self) -> None:
+        """Close all pooled connections. Call on application shutdown."""
+        if self._server is not None:
+            Connection.unbind_server(self._server)
+            self._server = None
+            logger.info("LDAP connection pool closed")
+
     def healthcheck(self) -> bool:
         if not self.settings.ldap_host:
             logger.info("LDAP healthcheck skipped: LDAP_HOST is not configured")
@@ -81,14 +108,14 @@ class LdapClient:
         with self._connection():
             return True
 
-    def search_people(self, query: str) -> list[SearchResult]:
+    def search_people(self, query: str) -> List[SearchResult]:
         logger.info("LDAP search requested")
         normalized_query = query.strip()
         if not normalized_query:
             return []
 
-        seen_dns: set[str] = set()
-        results: list[SearchResult] = []
+        seen_dns: set = set()
+        results: List[SearchResult] = []
         ldap_filter = _build_people_filter(normalized_query)
 
         with self._connection() as connection:
@@ -109,7 +136,7 @@ class LdapClient:
 
         return sorted(results, key=_search_result_sort_key)
 
-    def get_card(self, object_id: str) -> EmployeeCard | None:
+    def get_card(self, object_id: str) -> Optional[EmployeeCard]:
         logger.info("LDAP card lookup requested")
         with self._connection() as connection:
             connection.search(
@@ -122,7 +149,7 @@ class LdapClient:
                 return None
             return _entry_to_employee_card(connection.entries[0].entry_attributes_as_dict, object_id)
 
-    def dump_test_object_attributes(self, ldap_filter: str) -> list[dict[str, object]]:
+    def dump_test_object_attributes(self, ldap_filter: str) -> List[Dict[str, object]]:
         with self._connection() as connection:
             connection.search(
                 search_base=self.settings.ldap_base_dn,
@@ -131,7 +158,7 @@ class LdapClient:
             )
             return [entry.entry_attributes_as_dict for entry in connection.entries]
 
-    def _search_bases(self) -> list[str]:
+    def _search_bases(self) -> List[str]:
         return self.settings.included_ous or [self.settings.ldap_base_dn]
 
     def _is_excluded_dn(self, dn: str) -> bool:
@@ -190,7 +217,7 @@ def _build_name_token_filter(token: str) -> str:
     )
 
 
-def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchResult:
+def _entry_to_search_result(attributes: Dict[str, object], dn: str) -> SearchResult:
     card = _entry_to_employee_card(attributes, dn)
     return SearchResult(
         object_id=dn,
@@ -208,7 +235,7 @@ def _entry_to_search_result(attributes: dict[str, object], dn: str) -> SearchRes
     )
 
 
-def _entry_to_employee_card(attributes: dict[str, object], dn: str) -> EmployeeCard:
+def _entry_to_employee_card(attributes: Dict[str, object], dn: str) -> EmployeeCard:
     object_classes = [item.lower() for item in _get_values(attributes, "objectClass")]
     object_type = "contact" if "contact" in object_classes else "user"
     display_name, company = _split_name_and_company(_first_value(attributes, "cn") or _first_value(attributes, "name") or dn)
@@ -233,7 +260,7 @@ def _entry_to_employee_card(attributes: dict[str, object], dn: str) -> EmployeeC
     )
 
 
-def _split_name_and_company(cn: str) -> tuple[str, str | None]:
+def _split_name_and_company(cn: str) -> Tuple[str, Optional[str]]:
     match = PARENTHESIZED_SUFFIX_RE.search(cn)
     if not match:
         return cn.strip(), None
@@ -242,7 +269,7 @@ def _split_name_and_company(cn: str) -> tuple[str, str | None]:
     return name, company
 
 
-def _manager_display_name(manager_dn: str | None) -> str | None:
+def _manager_display_name(manager_dn: Optional[str]) -> Optional[str]:
     if not manager_dn:
         return None
     if not manager_dn.lower().startswith("cn="):
@@ -251,7 +278,7 @@ def _manager_display_name(manager_dn: str | None) -> str | None:
     return cn_part.replace(r"\,", ",").strip() or None
 
 
-def _split_office_room(value: str | None) -> tuple[str | None, str | None]:
+def _split_office_room(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     if not value:
         return None, None
     if "\\" not in value:
@@ -260,12 +287,12 @@ def _split_office_room(value: str | None) -> tuple[str | None, str | None]:
     return _normalize_office(office), room.strip() or None
 
 
-def _normalize_office(value: str) -> str | None:
+def _normalize_office(value: str) -> Optional[str]:
     normalized = value.strip().replace("-", "")
     return normalized or None
 
 
-def _first_bytes(attributes: dict[str, object], name: str) -> bytes | None:
+def _first_bytes(attributes: Dict[str, object], name: str) -> Optional[bytes]:
     values = _get_values(attributes, name)
     for value in values:
         if isinstance(value, bytes):
@@ -273,14 +300,14 @@ def _first_bytes(attributes: dict[str, object], name: str) -> bytes | None:
     return None
 
 
-def _first_value(attributes: dict[str, object], name: str) -> str | None:
+def _first_value(attributes: Dict[str, object], name: str) -> Optional[str]:
     values = _get_values(attributes, name)
     if not values:
         return None
     return str(values[0])
 
 
-def _get_values(attributes: dict[str, object], name: str) -> list[object]:
+def _get_values(attributes: Dict[str, object], name: str) -> List[object]:
     value = attributes.get(name)
     if value is None:
         return []
@@ -289,5 +316,5 @@ def _get_values(attributes: dict[str, object], name: str) -> list[object]:
     return [value]
 
 
-def _search_result_sort_key(result: SearchResult) -> tuple[int, str]:
+def _search_result_sort_key(result: SearchResult) -> Tuple[int, str]:
     return (0 if result.object_type == "user" else 1, result.display_name.lower())
