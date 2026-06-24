@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 
 from app.botx_client import BotxClient, close_http_client
 from app.cache import CardCache
@@ -17,7 +18,6 @@ from app.formatter import (
     SEARCH_HEADER,
     TOO_MANY_RESULTS_MESSAGE,
     format_search_result_card,
-    format_search_results,
 )
 from app.ldap_client import LdapClient
 from app.logging_config import configure_logging
@@ -58,19 +58,23 @@ async def status() -> Dict[str, str]:
 
 
 @app.post("/webhook")
-async def webhook(request: Request) -> dict[str, Any]:
-    return await _handle_command(request)
+async def webhook(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    return await _accept_command(request, background_tasks)
 
 
 @app.post("/command")
-async def command(request: Request) -> dict[str, Any]:
-    return await _handle_command(request)
+async def command(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    return await _accept_command(request, background_tasks)
 
 
-async def _handle_command(request: Request) -> dict[str, Any]:
+async def _accept_command(request: Request, background_tasks: BackgroundTasks) -> dict[str, Any]:
     body = await request.json()
     logger.info("BotX command received")
+    background_tasks.add_task(_handle_command, body)
+    return {"status": "ok"}
 
+
+async def _handle_command(body: dict[str, Any]) -> None:
     command = _extract_text(body)
     normalized_command = command.casefold()
     user_huid = _extract_user_huid(body)
@@ -82,34 +86,47 @@ async def _handle_command(request: Request) -> dict[str, Any]:
         if user_huid not in settings.admin_huids:
             logger.warning("cache clear denied")
             message = "Команда доступна только администраторам бота."
-            sent = await _send_botx_message(chat_id, cts_host, message)
-            return {"status": "ok", "message": message, "sent": sent}
+            await _send_botx_message(chat_id, cts_host, message)
+            return
         deleted = card_cache.clear()
         logger.info("cache cleared")
         message = f"Кеш очищен. Удалено записей: {deleted}."
-        sent = await _send_botx_message(chat_id, cts_host, message)
-        return {"status": "ok", "message": message, "sent": sent}
+        await _send_botx_message(chat_id, cts_host, message)
+        return
 
     if normalized_command in {"", "/start", "start", "старт", "/help", "help", "помощь"}:
         message = "Для поиска введите ФИО или просто фамилию"
-        sent = await _send_botx_message(chat_id, cts_host, message)
-        return {"status": "ok", "message": message, "sent": sent}
+        await _send_botx_message(chat_id, cts_host, message)
+        return
 
     if RESTRICTED_QUERY in _command_tokens(normalized_command):
-        sent = await _send_botx_message(chat_id, cts_host, RESTRICTED_MESSAGE)
-        admin_sent = await _notify_admins_about_restricted_query(
+        await asyncio.gather(
+            _send_botx_message(chat_id, cts_host, RESTRICTED_MESSAGE),
+            _notify_admins_about_restricted_query(
+                chat_id,
+                cts_host,
+                user_display_name,
+                user_huid,
+                command,
+            ),
+        )
+        return
+
+    try:
+        results = await asyncio.to_thread(ldap_client.search_people, command)
+        if not results:
+            await _send_botx_message(chat_id, cts_host, NOT_FOUND_MESSAGE)
+            return
+        await _send_botx_message(chat_id, cts_host, SEARCH_HEADER)
+        results = await _enrich_results_with_express_links(results, cts_host)
+        await _send_search_results(chat_id, cts_host, results, include_header=False)
+    except Exception:
+        logger.exception("Command processing failed")
+        await _send_botx_message(
             chat_id,
             cts_host,
-            user_display_name,
-            user_huid,
-            command,
+            "Не удалось выполнить поиск. Попробуйте повторить запрос позже.",
         )
-        return {"status": "ok", "message": RESTRICTED_MESSAGE, "sent": sent, "admin_sent": admin_sent}
-
-    results = await _enrich_results_with_express_links(ldap_client.search_people(command), cts_host)
-    message = format_search_results(results, settings.search_limit)
-    sent = await _send_search_results(chat_id, cts_host, results)
-    return {"status": "ok", "message": message, "sent": sent}
 
 
 def _extract_text(body: dict[str, Any]) -> str:
@@ -240,7 +257,13 @@ async def _send_botx_messages(chat_id: str, cts_host: str, messages: list[str]) 
     return all(sent_results)
 
 
-async def _send_search_results(chat_id: str, cts_host: str, results: list[SearchResult]) -> bool:
+async def _send_search_results(
+    chat_id: str,
+    cts_host: str,
+    results: list[SearchResult],
+    *,
+    include_header: bool = True,
+) -> bool:
     if not chat_id:
         logger.info("BotX send skipped: group_chat_id is empty")
         return False
@@ -248,7 +271,9 @@ async def _send_search_results(chat_id: str, cts_host: str, results: list[Search
         return await _send_botx_message(chat_id, cts_host, NOT_FOUND_MESSAGE)
 
     client = BotxClient(settings, cts_host)
-    sent_results = [await client.send_text(chat_id, SEARCH_HEADER)]
+    sent_results = []
+    if include_header:
+        sent_results.append(await client.send_text(chat_id, SEARCH_HEADER))
     for result in results[: settings.search_limit]:
         sent_results.append(await _send_search_result_card(client, chat_id, result))
 
@@ -336,14 +361,19 @@ async def _enrich_results_with_express_links(results: list[SearchResult], cts_ho
         return results
 
     client = BotxClient(settings, cts_host)
-    enriched_results = []
-    for result in results:
-        express_link = await _find_express_profile_link(client, result.email, cts_host)
-        if express_link:
-            enriched_results.append(replace(result, express_chat_url=express_link))
-        else:
-            enriched_results.append(result)
-    return enriched_results
+    links = await asyncio.gather(
+        *(
+            _find_express_profile_link(client, result.email, cts_host)
+            for result in results
+        ),
+        return_exceptions=True,
+    )
+    return [
+        replace(result, express_chat_url=link)
+        if isinstance(link, str) and link
+        else result
+        for result, link in zip(results, links)
+    ]
 
 
 async def _find_express_profile_link(client: BotxClient, email: str | None, cts_host: str) -> str | None:

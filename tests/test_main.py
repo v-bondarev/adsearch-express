@@ -99,8 +99,8 @@ class TestRestrictedQuery:
                 )
 
                 assert response.status_code == 200
-                data = response.json()
-                assert "message" in data
+                assert response.json() == {"status": "ok"}
+                mock_send.assert_awaited()
 
 
 class TestHelpCommands:
@@ -120,8 +120,8 @@ class TestHelpCommands:
             )
 
             assert response.status_code == 200
-            data = response.json()
-            assert "message" in data
+            assert response.json() == {"status": "ok"}
+            mock_send.assert_awaited()
 
     def test_help_command_returns_help_message(self, app_client, mock_settings):
         """Test /help returns help message."""
@@ -300,8 +300,8 @@ class TestClearCacheCommand:
             )
 
             assert response.status_code == 200
-            data = response.json()
-            assert "message" in data
+            assert response.json() == {"status": "ok"}
+            mock_send.assert_awaited()
 
 
 class TestPhotoMimeDetection:
