@@ -1,6 +1,8 @@
 """Tests for formatter module."""
 import pytest
+from datetime import date
 from app.formatter import (
+    _birthday_with_celebration,
     format_search_results,
     format_search_messages,
     format_search_result_card,
@@ -175,7 +177,7 @@ class TestFormatSearchResultCard:
         assert "**✉️ E-mail:** test@example.com" in result
         assert "**🚪 Кабинет:** 317" in result
         assert "**🏢 Офис:** БЯ9" in result
-        assert "**🎂 День рождения:** 24 июня" in result
+        assert "**📅 День рождения:**" in result
         assert "**👤 Руководитель:** Руководитель" in result
         assert "**💬 Написать в eXpress:**" in result
 
@@ -223,3 +225,21 @@ class TestEmojiInFormatting:
         """Test office field has building emoji."""
         result = format_search_result_card(sample_search_result)
         assert "🏢" in result
+
+    def test_birthday_has_cake_only_today(self):
+        """Test the birthday cake is shown only on the matching date."""
+        assert _birthday_with_celebration(
+            "24 июня",
+            today=date(2026, 6, 24),
+        ) == "🎂 24 июня"
+        assert _birthday_with_celebration(
+            "24 июня",
+            today=date(2026, 6, 25),
+        ) == "24 июня"
+
+    def test_birthday_fallback_keeps_unknown_format(self):
+        """Test an unexpected display value is left unchanged."""
+        assert _birthday_with_celebration(
+            "дата не распознана",
+            today=date(2026, 6, 24),
+        ) == "дата не распознана"
