@@ -40,19 +40,13 @@ SEARCH_ATTRIBUTES = [
     "thumbnailPhoto",
 ]
 
-# Connection pool settings
-POOL_NAME = "adsearch_pool"
-POOL_SIZE = 5
-POOL_LIFETIME = 3600  # seconds
-
-
 class LdapClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._server: Optional[Server] = None
 
     def _get_server(self) -> Server:
-        """Get or create the LDAP server with pooling support."""
+        """Get or create the reusable LDAP server configuration."""
         if self._server is not None:
             return self._server
 
@@ -71,15 +65,12 @@ class LdapClient:
             get_info=ALL,
             tls=tls,
             connect_timeout=self.settings.ldap_connect_timeout_seconds,
-            pool_name=POOL_NAME,
-            pool_size=POOL_SIZE,
-            pool_lifetime=POOL_LIFETIME,
         )
         return self._server
 
     @contextmanager
     def _connection(self) -> Iterator[Connection]:
-        """Get a connection from the pool or create a new one."""
+        """Create a bound connection and always unbind it after use."""
         server = self._get_server()
         connection = Connection(
             server,
@@ -94,11 +85,10 @@ class LdapClient:
             connection.unbind()
 
     def close_pool(self) -> None:
-        """Close all pooled connections. Call on application shutdown."""
+        """Release the cached server configuration on shutdown."""
         if self._server is not None:
-            Connection.unbind_server(self._server)
             self._server = None
-            logger.info("LDAP connection pool closed")
+            logger.info("LDAP server configuration released")
 
     def healthcheck(self) -> bool:
         if not self.settings.ldap_host:

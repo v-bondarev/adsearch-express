@@ -48,6 +48,31 @@ class TestLdapClient:
         call_kwargs = mock_server.call_args[1]
         assert call_kwargs["use_ssl"] is True
         assert call_kwargs["port"] == 636
+        assert "pool_name" not in call_kwargs
+        assert "pool_size" not in call_kwargs
+        assert "pool_lifetime" not in call_kwargs
+
+    @patch("app.ldap_client.Server")
+    def test_server_configuration_is_reused(self, mock_server, test_settings):
+        """Test the immutable Server configuration is created only once."""
+        server = MagicMock()
+        mock_server.return_value = server
+        client = LdapClient(test_settings)
+
+        assert client._get_server() is server
+        assert client._get_server() is server
+        mock_server.assert_called_once()
+
+    @patch("app.ldap_client.Server")
+    def test_close_pool_releases_cached_server(self, mock_server, test_settings):
+        """Test shutdown releases the cached Server configuration."""
+        mock_server.return_value = MagicMock()
+        client = LdapClient(test_settings)
+        client._get_server()
+
+        client.close_pool()
+
+        assert client._server is None
 
     @patch("app.ldap_client.Connection")
     @patch("app.ldap_client.Server")

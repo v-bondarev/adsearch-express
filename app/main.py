@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
     init_db(settings.cache_db_path)
     logger.info("application started")
     yield
-    # Graceful shutdown: close LDAP connection pool and HTTP client
+    # Graceful shutdown: release LDAP state and close the HTTP client.
     ldap_client.close_pool()
     await close_http_client()
     logger.info("application stopped")
@@ -49,6 +49,11 @@ card_cache = CardCache(settings.cache_db_path, settings.cache_ttl_seconds)
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/status")
+async def status() -> Dict[str, str]:
     return {"status": "ok"}
 
 

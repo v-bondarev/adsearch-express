@@ -48,6 +48,19 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
+    def test_status_returns_ok(self, app_client):
+        """Test the BotX status probe endpoint."""
+        response = app_client.get(
+            "/status",
+            params={
+                "user_huid": "test-user",
+                "bot_id": "test-bot",
+                "chat_type": "chat",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
 
 class TestWebhookEndpoints:
     """Test webhook endpoints."""

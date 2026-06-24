@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Исправлено
+
+- Удалены неподдерживаемые параметры `pool_name`, `pool_size` и
+  `pool_lifetime` из конструктора `ldap3.Server`, из-за которых любой поиск
+  завершался ошибкой HTTP 500.
+- Добавлен endpoint `GET /status` для служебной проверки бота со стороны
+  eXpress.
+
 ### Добавлено
 
 - **Тесты** — добавлен полный набор unit-тестов (pytest):
@@ -15,13 +23,11 @@
   - `tests/test_main.py` — тесты эндпоинтов и обработки команд
   - 123 теста (122 passed, 1 skipped)
 
-- **Connection Pooling для LDAP** — сервер LDAP создаётся с пулом соединений:
-  - `pool_name="adsearch_pool"`
-  - `pool_size=5`
-  - `pool_lifetime=3600`
+- **Повторное использование конфигурации LDAP** — объект `ldap3.Server`
+  создаётся один раз, а соединения гарантированно закрываются после запроса.
 
-- **Graceful Shutdown** — при остановке приложения корректно закрываются:
-  - LDAP connection pool (`ldap_client.close_pool()`)
+- **Graceful Shutdown** — при остановке приложения корректно освобождаются:
+  - состояние LDAP-клиента (`ldap_client.close_pool()`)
   - HTTP клиент (`await close_http_client()`)
 
 - **HTTP Client Reuse** — `httpx.AsyncClient` создаётся один раз и переиспользуется для всех запросов
