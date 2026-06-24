@@ -62,6 +62,7 @@ def _format_person_fields(person: Union[SearchResult, EmployeeCard]) -> List[str
         ("✉️ E-mail", person.email),
         ("🚪 Кабинет", person.room),
         ("🏢 Офис", person.office),
+        ("🎂 День рождения", person.birthday),
         ("👤 Руководитель", person.manager),
     ]
     for label, value in optional_fields:

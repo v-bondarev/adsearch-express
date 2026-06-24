@@ -13,6 +13,7 @@ from app.ldap_client import (
     _split_name_and_company,
     _split_office_room,
     _normalize_office,
+    _format_birthday,
     _manager_display_name,
     SEARCH_ATTRIBUTES,
 )
@@ -27,6 +28,7 @@ class TestLdapClient:
         assert "displayName" in SEARCH_ATTRIBUTES
         assert "mail" in SEARCH_ATTRIBUTES
         assert "thumbnailPhoto" in SEARCH_ATTRIBUTES
+        assert "extensionAttribute4" in SEARCH_ATTRIBUTES
 
     def test_client_initialization(self, test_settings):
         """Test LdapClient initializes with settings."""
@@ -302,6 +304,24 @@ class TestEntryConversion:
         assert _normalize_office("") is None
         assert _normalize_office("   ") is None
 
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [
+            ("1985-06-24", "24 июня"),
+            ("19850624000000.0Z", "24 июня"),
+            ("24.06.1985", "24 июня"),
+            ("24/6/85", "24 июня"),
+            ("24-06", "24 июня"),
+            ("", None),
+            ("unknown", None),
+            ("1985-13-24", None),
+            ("31.02.1985", None),
+        ],
+    )
+    def test_format_birthday(self, source, expected):
+        """Test birthday formatting hides the year."""
+        assert _format_birthday(source) == expected
+
     def test_manager_display_name_extracts_cn(self):
         """Test _manager_display_name extracts CN from DN."""
         result = _manager_display_name("CN=Петров Петр,OU=Employees,DC=example,DC=com")
@@ -328,6 +348,7 @@ class TestEntryConversion:
         assert card.display_name == "Иванов Иван Иванович"
         assert card.company == "Example Corp"
         assert card.email == "ivanov@example.com"
+        assert card.birthday == "24 июня"
 
     def test_entry_to_employee_card_contact(self, mock_contact_entry):
         """Test _entry_to_employee_card identifies contact object type."""

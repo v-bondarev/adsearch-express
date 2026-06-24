@@ -42,6 +42,7 @@ def mock_ldap_entry():
         "displayName": ["Иванов Иван Иванович"],
         "sn": ["Иванов"],
         "givenName": ["Иван"],
+        "extensionAttribute4": ["1985-06-24"],
         "title": ["Инженер"],
         "department": ["IT Department"],
         "company": ["Example Corp"],

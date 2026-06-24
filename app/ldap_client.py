@@ -4,6 +4,7 @@ import logging
 import re
 import ssl
 from contextlib import contextmanager
+from datetime import date
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from ldap3 import ALL, ALL_ATTRIBUTES, BASE, SUBTREE, Connection, Server, Tls
@@ -28,6 +29,7 @@ SEARCH_ATTRIBUTES = [
     "extensionAttribute1",
     "extensionAttribute2",
     "extensionAttribute3",
+    "extensionAttribute4",
     "title",
     "department",
     "company",
@@ -219,6 +221,7 @@ def _entry_to_search_result(attributes: Dict[str, object], dn: str) -> SearchRes
         email=card.email,
         office=card.office,
         room=card.room,
+        birthday=card.birthday,
         manager=card.manager,
         photo=card.photo,
         object_type=card.object_type,
@@ -244,6 +247,7 @@ def _entry_to_employee_card(attributes: Dict[str, object], dn: str) -> EmployeeC
         email=_first_value(attributes, "mail"),
         office=office,
         room=room,
+        birthday=_format_birthday(_first_value(attributes, "extensionAttribute4")),
         manager=_manager_display_name(_first_value(attributes, "manager")),
         photo=_first_bytes(attributes, "thumbnailPhoto"),
         object_type=object_type,
@@ -280,6 +284,47 @@ def _split_office_room(value: Optional[str]) -> Tuple[Optional[str], Optional[st
 def _normalize_office(value: str) -> Optional[str]:
     normalized = value.strip().replace("-", "")
     return normalized or None
+
+
+def _format_birthday(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+
+    normalized = value.strip()
+    day = month = None
+
+    year_first = re.match(r"^\d{4}[-./]?(\d{2})[-./]?(\d{2})", normalized)
+    if year_first:
+        month, day = year_first.groups()
+    else:
+        day_first = re.match(r"^(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?", normalized)
+        if day_first:
+            day, month = day_first.groups()
+
+    if day is None or month is None:
+        return None
+
+    day_number = int(day)
+    month_number = int(month)
+    month_names = [
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
+    ]
+    try:
+        date(2000, month_number, day_number)
+    except ValueError:
+        return None
+    return f"{day_number} {month_names[month_number - 1]}"
 
 
 def _first_bytes(attributes: Dict[str, object], name: str) -> Optional[bytes]:

@@ -46,6 +46,7 @@ class CardCache:
             "email": card.email,
             "office": card.office,
             "room": card.room,
+            "birthday": card.birthday,
             "manager": card.manager,
             "express_chat_url": card.express_chat_url,
             "object_type": card.object_type,

@@ -25,6 +25,7 @@ def sample_search_result() -> SearchResult:
         email="test@example.com",
         office="БЯ9",
         room="317",
+        birthday="24 июня",
         manager="Руководитель",
         express_chat_url="https://xlnk.ms/chat/abc123",
     )
@@ -154,6 +155,7 @@ class TestFormatSearchResultCard:
             ("E-mail", sample_search_result.email),
             ("Кабинет", sample_search_result.room),
             ("Офис", sample_search_result.office),
+            ("День рождения", sample_search_result.birthday),
             ("Руководитель", sample_search_result.manager),
         ]
 
@@ -173,6 +175,7 @@ class TestFormatSearchResultCard:
         assert "**✉️ E-mail:** test@example.com" in result
         assert "**🚪 Кабинет:** 317" in result
         assert "**🏢 Офис:** БЯ9" in result
+        assert "**🎂 День рождения:** 24 июня" in result
         assert "**👤 Руководитель:** Руководитель" in result
         assert "**💬 Написать в eXpress:**" in result
 

@@ -15,6 +15,7 @@ class SearchResult:
     email: Optional[str] = None
     office: Optional[str] = None
     room: Optional[str] = None
+    birthday: Optional[str] = None
     manager: Optional[str] = None
     express_chat_url: Optional[str] = None
     photo: Optional[bytes] = None
@@ -33,6 +34,7 @@ class EmployeeCard:
     email: Optional[str] = None
     office: Optional[str] = None
     room: Optional[str] = None
+    birthday: Optional[str] = None
     manager: Optional[str] = None
     express_chat_url: Optional[str] = None
     photo: Optional[bytes] = None
