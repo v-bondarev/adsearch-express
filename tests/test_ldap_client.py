@@ -28,7 +28,7 @@ class TestLdapClient:
         assert "displayName" in SEARCH_ATTRIBUTES
         assert "mail" in SEARCH_ATTRIBUTES
         assert "thumbnailPhoto" in SEARCH_ATTRIBUTES
-        assert "extensionAttribute4" in SEARCH_ATTRIBUTES
+        assert "extensionAttribute5" in SEARCH_ATTRIBUTES
 
     def test_client_initialization(self, test_settings):
         """Test LdapClient initializes with settings."""
