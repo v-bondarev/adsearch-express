@@ -6,10 +6,13 @@ cd "$(dirname "$0")/.."
 echo "=== Pulling latest changes from Git ==="
 git pull --ff-only origin main
 
-echo "=== Building and updating container ==="
-# Compose builds the new image before replacing the running container.
-# Docker layer cache keeps dependency installation and unchanged layers fast.
-docker compose up -d --build --remove-orphans bot
+echo "=== Building image ==="
+# requirements.txt is cached separately, so application-only changes do not
+# reinstall Python packages.
+docker compose build bot
+
+echo "=== Updating container ==="
+docker compose up -d --no-build --remove-orphans bot
 
 container_id="$(docker compose ps -q bot)"
 if [[ -z "$container_id" ]]; then
