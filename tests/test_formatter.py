@@ -44,16 +44,16 @@ class TestFormatSearchResults:
         assert SEARCH_HEADER in result
         assert sample_search_result.display_name in result
 
-    def test_multiple_results_with_index(self, sample_search_result):
-        """Test multiple results include index."""
+    def test_multiple_results_without_index(self, sample_search_result):
+        """Test multiple results do not include ordinal numbers."""
         second_result = SearchResult(
             object_id="CN=User2",
             display_name="Пользователь Второй",
         )
         result = format_search_results([sample_search_result, second_result], limit=5)
 
-        assert "1." in result
-        assert "2." in result
+        assert "1. " not in result
+        assert "2. " not in result
         assert sample_search_result.display_name in result
         assert "Пользователь Второй" in result
 
@@ -105,11 +105,11 @@ class TestFormatSearchMessages:
 class TestFormatSearchResultCard:
     """Test format_search_result_card function."""
 
-    def test_card_with_index(self, sample_search_result):
-        """Test card includes index when provided."""
+    def test_card_ignores_index(self, sample_search_result):
+        """Test legacy index argument does not add an ordinal number."""
         result = format_search_result_card(sample_search_result, index=1)
-        assert result.startswith("1. ")
-        assert sample_search_result.display_name in result
+        assert result.startswith(f"**{sample_search_result.display_name}**")
+        assert not result.startswith("1. ")
 
     def test_card_without_index(self, sample_search_result):
         """Test card without index."""
@@ -143,7 +143,7 @@ class TestFormatSearchResultCard:
         lines = result.split("\n")
 
         # Name should be first
-        assert sample_search_result.display_name in lines[0]
+        assert lines[0] == f"**{sample_search_result.display_name}**"
 
         # Optional fields in order
         field_order = [
@@ -160,7 +160,21 @@ class TestFormatSearchResultCard:
         # Check all non-empty fields are present
         for label, value in field_order:
             if value:
-                assert f"{label}:" in result
+                assert f"{label}:**" in result
+
+    def test_card_uses_bold_labels(self, sample_search_result):
+        """Test all visible labels are bold."""
+        result = format_search_result_card(sample_search_result)
+
+        assert "**Должность:** Инженер" in result
+        assert "**Подразделение:** IT" in result
+        assert "**Компания:** Example Corp" in result
+        assert "**☎️ Внутренний телефон:** 1234" in result
+        assert "**✉️ E-mail:** test@example.com" in result
+        assert "**🚪 Кабинет:** 317" in result
+        assert "**🏢 Офис:** БЯ9" in result
+        assert "**👤 Руководитель:** Руководитель" in result
+        assert "**💬 Написать в eXpress:**" in result
 
 
 class TestFormatEmployeeCard:

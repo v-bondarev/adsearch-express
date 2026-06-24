@@ -249,8 +249,8 @@ async def _send_search_results(chat_id: str, cts_host: str, results: list[Search
 
     client = BotxClient(settings, cts_host)
     sent_results = [await client.send_text(chat_id, SEARCH_HEADER)]
-    for index, result in enumerate(results[: settings.search_limit], start=1):
-        sent_results.append(await _send_search_result_card(client, chat_id, result, index))
+    for result in results[: settings.search_limit]:
+        sent_results.append(await _send_search_result_card(client, chat_id, result))
 
     if len(results) > settings.search_limit:
         sent_results.append(await client.send_text(chat_id, TOO_MANY_RESULTS_MESSAGE))
@@ -258,22 +258,22 @@ async def _send_search_results(chat_id: str, cts_host: str, results: list[Search
     return all(sent_results)
 
 
-async def _send_search_result_card(client: BotxClient, chat_id: str, result: SearchResult, index: int) -> bool:
-    caption = format_search_result_card(result, index=index)
+async def _send_search_result_card(client: BotxClient, chat_id: str, result: SearchResult) -> bool:
+    caption = format_search_result_card(result)
     if result.photo:
         return await client.send_file(
             chat_id,
             result.photo,
-            file_name=f"{_photo_file_stem(result, index)}.{_photo_extension(result.photo)}",
+            file_name=f"{_photo_file_stem(result)}.{_photo_extension(result.photo)}",
             mime_type=_photo_mime_type(result.photo),
-            caption=caption,
+            caption=f"\n{caption}",
         )
     return await client.send_text(chat_id, caption)
 
 
-def _photo_file_stem(result: SearchResult, index: int) -> str:
+def _photo_file_stem(result: SearchResult) -> str:
     normalized_name = re.sub(r"[^0-9A-Za-zА-Яа-яЁё_-]+", "-", result.display_name).strip("-")
-    return normalized_name or f"employee-{index}"
+    return normalized_name or "employee"
 
 
 def _photo_mime_type(photo: bytes) -> str:

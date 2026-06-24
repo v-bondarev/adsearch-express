@@ -324,6 +324,25 @@ class TestPhotoMimeDetection:
         assert _photo_mime_type(b"\xff\xd8\xff\xe0") == "image/jpeg"
         assert _photo_mime_type(b"random data") == "image/jpeg"
 
+    @pytest.mark.asyncio
+    async def test_photo_caption_starts_with_blank_line(self, app_client, mock_settings):
+        """Test employee details are visually separated from the photo."""
+        from app.main import _send_search_result_card
+        from app.models import SearchResult
+
+        client = MagicMock()
+        client.send_file = AsyncMock(return_value=True)
+        result = SearchResult(
+            object_id="CN=Test User",
+            display_name="Тестов Тест",
+            photo=b"\xff\xd8\xff\xe0",
+        )
+
+        assert await _send_search_result_card(client, "chat123", result) is True
+        assert client.send_file.await_args.kwargs["caption"].startswith(
+            "\n**Тестов Тест**"
+        )
+
 
 class TestCommandTokens:
     """Test command tokenization."""
