@@ -123,9 +123,18 @@ curl http://127.0.0.1:${APP_PORT:-8181}/health
 
 ```bash
 cd adsearch-express
-git pull
-docker compose up --build -d
-docker compose logs -f bot
+./scripts/deploy.sh
+```
+
+Скрипт получает `main` через `git pull --ff-only`, использует Docker layer
+cache и собирает новый образ до замены работающего контейнера. После запуска он
+проверяет `/health` внутри контейнера каждую секунду и завершается сразу после
+готовности приложения. При ошибке выводятся последние 100 строк логов.
+
+Таймаут ожидания по умолчанию — 30 секунд:
+
+```bash
+DEPLOY_HEALTH_TIMEOUT=60 ./scripts/deploy.sh
 ```
 
 ## Проверка LDAP и webhook
