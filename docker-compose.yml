@@ -1,5 +1,6 @@
 services:
   bot:
+    image: adsearch-express:local
     build:
       context: .
       args:
@@ -8,10 +9,35 @@ services:
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     env_file:
       - .env
+    environment:
+      INTERNAL_API_TOKEN: ""
     ports:
       - "${APP_PORT:-8181}:8000"
     volumes:
       - bot-data:/data
+      - "${LDAP_BIND_PASSWORD_FILE_HOST:-/dev/null}:/run/secrets/ldap_bind_password:ro"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  api:
+    image: adsearch-express:local
+    build:
+      context: .
+      args:
+        APP_UID: "${APP_UID:-1000}"
+        APP_GID: "${APP_GID:-1000}"
+    command: ["uvicorn", "app.api_main:app", "--host", "0.0.0.0", "--port", "8000"]
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${INTERNAL_API_PORT:-8183}:8000"
+    volumes:
       - "${LDAP_BIND_PASSWORD_FILE_HOST:-/dev/null}:/run/secrets/ldap_bind_password:ro"
     restart: unless-stopped
     healthcheck:

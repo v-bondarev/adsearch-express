@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_port: int = 8181
     log_level: str = "INFO"
+    internal_api_token: str = ""
 
     bot_id: str = ""
     bot_secret_key: str = ""
@@ -39,6 +40,10 @@ class Settings(BaseSettings):
     search_limit: int = 5
     cache_db_path: Path = Field(default=Path("/data/cache.sqlite3"))
     cache_ttl_seconds: int = 86400
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.casefold() in {"prod", "production"}
 
     @property
     def admin_huids(self) -> Set[str]:

@@ -90,6 +90,8 @@ sudoedit /etc/adsearch-express/ldap_bind_password
 ```dotenv
 APP_UID=1000
 APP_GID=1000
+INTERNAL_API_PORT=8183
+INTERNAL_API_TOKEN=<длинный случайный токен>
 LDAP_BIND_PASSWORD=
 LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap_bind_password
 LDAP_BIND_PASSWORD_FILE_HOST=/etc/adsearch-express/ldap_bind_password
@@ -105,12 +107,19 @@ LDAP_BIND_PASSWORD_FILE_HOST=/etc/adsearch-express/ldap_bind_password
 docker compose up --build -d
 ```
 
+Compose запускает существующий BotX-сервис `bot` на порту `8181` и внутренний
+сервис `api` на `127.0.0.1:8183`. Порт API недоступен с других машин. В
+production значение `INTERNAL_API_TOKEN` обязательно.
+
+Токен можно сгенерировать командой `openssl rand -hex 32`.
+
 Проверка статуса:
 
 ```bash
 docker compose ps
 docker compose logs -f bot
 curl http://127.0.0.1:${APP_PORT:-8181}/health
+curl http://127.0.0.1:${INTERNAL_API_PORT:-8183}/health
 ```
 
 Ожидаемый ответ health endpoint:
@@ -127,9 +136,9 @@ cd adsearch-express
 ```
 
 Скрипт получает `main` через `git pull --ff-only`, использует Docker layer
-cache и собирает новый образ до замены работающего контейнера. После запуска он
-проверяет `/health` внутри контейнера каждую секунду и завершается сразу после
-готовности приложения. При ошибке выводятся последние 100 строк логов.
+cache и собирает новый образ до замены работающих контейнеров. После запуска он
+проверяет `/health` внутри `bot` и `api` каждую секунду и завершается после
+готовности обоих приложений. При ошибке выводятся последние 100 строк логов.
 
 Слой Python-зависимостей пересобирается только при изменении
 `requirements.txt` или базового образа. Изменения файлов приложения не запускают
