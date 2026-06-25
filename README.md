@@ -210,6 +210,9 @@ Python-пакеты находятся в отдельном слое Dockerfile
 DEPLOY_HEALTH_TIMEOUT=60 ./scripts/deploy.sh
 ```
 
+Проверка `/health` внутри контейнеров принудительно обходит HTTP proxy, поэтому
+корпоративные proxy-переменные не должны влиять на localhost-запросы.
+
 ## Архитектура
 
 ### LDAP Connections

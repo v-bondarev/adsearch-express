@@ -30,7 +30,7 @@ for service in bot api; do
 
     while (( SECONDS < deadline )); do
         if docker compose exec -T "$service" python -c \
-            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=1).read()" \
+            "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:8000/health', timeout=1).read()" \
             >/dev/null 2>&1; then
             echo "$service is ready"
             break
