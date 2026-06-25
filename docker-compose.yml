@@ -42,6 +42,11 @@ services:
       no_proxy: "127.0.0.1,localhost"
     ports:
       - "127.0.0.1:${INTERNAL_API_PORT:-8183}:8000"
+    networks:
+      default:
+      adsearch-internal:
+        aliases:
+          - adsearch-api
     volumes:
       - "${LDAP_BIND_PASSWORD_FILE_HOST:-/dev/null}:/run/secrets/ldap_bind_password:ro"
     restart: unless-stopped
@@ -54,3 +59,7 @@ services:
 
 volumes:
   bot-data:
+
+networks:
+  adsearch-internal:
+    external: true

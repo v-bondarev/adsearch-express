@@ -11,6 +11,9 @@ echo "=== Building image ==="
 # reinstall Python packages.
 docker compose build bot
 
+echo "=== Ensuring internal Docker network ==="
+docker network inspect adsearch-internal >/dev/null 2>&1 || docker network create adsearch-internal
+
 echo "=== Updating container ==="
 docker compose up -d --no-build --remove-orphans bot api
 

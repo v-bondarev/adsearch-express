@@ -43,6 +43,7 @@
 - [Данные и доступы для Этапа 0](docs/stage-0-inputs.md)
 - [Тестовые запросы к Active Directory](docs/ad-test-queries.md)
 - [Запуск на CentOS VM](docs/vm-deploy-centos.md)
+- [Интеграция kteam-express с внутренним API](docs/kteam-express-adsearch-integration.md)
 
 ## Локальный запуск
 
@@ -83,6 +84,21 @@ http://127.0.0.1:8183/api/search
 BotX-сервис и его порт `8181` не изменяются. API-контейнер публикует только
 `GET /health` и `POST /api/search`; BotX endpoints через порт `8183`
 недоступны.
+
+Для доступа из других Docker-контейнеров API подключается к внешней сети
+`adsearch-internal` с DNS alias `adsearch-api`. Внутренний адрес для контейнеров:
+
+```text
+http://adsearch-api:8000
+```
+
+Сеть создаётся на VM один раз:
+
+```bash
+docker network create adsearch-internal
+```
+
+`scripts/deploy.sh` также создаёт эту сеть автоматически, если её ещё нет.
 
 Для доступа требуется Bearer-токен из `INTERNAL_API_TOKEN`. В production
 API-контейнер не запускается с пустым токеном.
