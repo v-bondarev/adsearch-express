@@ -12,7 +12,24 @@ echo "=== Building image ==="
 docker compose build bot
 
 echo "=== Ensuring internal Docker network ==="
-docker network inspect adsearch-internal >/dev/null 2>&1 || docker network create adsearch-internal
+internal_network="${ADSEARCH_INTERNAL_NETWORK:-adsearch-internal}"
+internal_subnet="${ADSEARCH_INTERNAL_SUBNET:-192.168.240.0/24}"
+
+if docker network inspect "$internal_network" >/dev/null 2>&1; then
+    current_subnets="$(docker network inspect "$internal_network" --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}')"
+    if ! grep -qx "$internal_subnet" <<<"$current_subnets"; then
+        echo "ERROR: Docker network $internal_network already exists with a different subnet:"
+        echo "$current_subnets"
+        echo "Expected subnet: $internal_subnet"
+        echo
+        echo "Stop containers attached to $internal_network, then recreate it:"
+        echo "  docker network rm $internal_network"
+        echo "  docker network create --driver bridge --subnet $internal_subnet $internal_network"
+        exit 1
+    fi
+else
+    docker network create --driver bridge --subnet "$internal_subnet" "$internal_network"
+fi
 
 echo "=== Updating container ==="
 docker compose up -d --no-build --remove-orphans bot api

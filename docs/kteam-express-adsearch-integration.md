@@ -15,7 +15,7 @@ adsearch-internal
 Создать сеть на VM один раз:
 
 ```bash
-docker network create adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
 ```
 
 Проверить:
@@ -23,6 +23,24 @@ docker network create adsearch-internal
 ```bash
 docker network inspect adsearch-internal
 ```
+
+Сеть должна быть создана именно в диапазоне `192.168.0.0/16`. Не использовать
+автоматически выбранные Docker подсети из `172.*`, потому что они могут
+пересечься с реальной корпоративной сетью VM.
+
+Если `adsearch-internal` уже создана с неправильной подсетью, остановить
+контейнеры, удалить сеть и создать её заново:
+
+```bash
+cd /opt/adsearch-express
+docker compose down
+docker network rm adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
+./scripts/deploy.sh
+```
+
+Если к этой сети уже подключён `kteam-express`, сначала остановить и его
+контейнеры, иначе Docker не даст удалить сеть.
 
 ## adsearch-express
 

@@ -95,10 +95,19 @@ http://adsearch-api:8000
 Сеть создаётся на VM один раз:
 
 ```bash
-docker network create adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
 ```
 
-`scripts/deploy.sh` также создаёт эту сеть автоматически, если её ещё нет.
+`scripts/deploy.sh` также создаёт эту сеть автоматически, если её ещё нет. Если
+сеть уже была создана Docker с конфликтующей подсетью, например из реального
+диапазона `172.23.0.0/16`, её нужно пересоздать:
+
+```bash
+docker compose down
+docker network rm adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
+./scripts/deploy.sh
+```
 
 Для доступа требуется Bearer-токен из `INTERNAL_API_TOKEN`. В production
 API-контейнер не запускается с пустым токеном.

@@ -114,10 +114,22 @@ production значение `INTERNAL_API_TOKEN` обязательно.
 Для доступа к API из других Docker-контейнеров создать внешнюю сеть:
 
 ```bash
-docker network create adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
 ```
 
-`scripts/deploy.sh` создаёт сеть автоматически, если она отсутствует.
+`scripts/deploy.sh` создаёт сеть автоматически, если она отсутствует. Подсеть
+зафиксирована в диапазоне `192.168.0.0/16`, чтобы Docker не выбрал
+конфликтующий диапазон из реальной сети, например `172.23.0.0/16`.
+
+Если сеть уже создана с неправильной подсетью, остановить контейнеры и
+пересоздать её:
+
+```bash
+docker compose down
+docker network rm adsearch-internal
+docker network create --driver bridge --subnet 192.168.240.0/24 adsearch-internal
+./scripts/deploy.sh
+```
 
 Контейнер `api` будет доступен в этой сети как:
 
