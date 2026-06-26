@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import AsyncIterator, Dict
 
-from fastapi import FastAPI, Header, HTTPException, status
+from fastapi import FastAPI, Header, HTTPException, Request, Response, status
 
 from app.api_models import (
     InternalSearchRequest,
@@ -17,12 +19,29 @@ from app.botx_client import close_http_client
 from app.config import get_settings
 from app.ldap_client import LdapClient
 from app.logging_config import configure_logging
-from app.main import RESTRICTED_QUERY, _command_tokens, _enrich_results_with_express_links
+from app.main import (
+    RESTRICTED_QUERY,
+    _command_tokens,
+    _enrich_results_with_express_links,
+    _photo_mime_type,
+)
+from app.models import SearchResult
 
 settings = get_settings()
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 ldap_client = LdapClient(settings)
+PHOTO_TTL_SECONDS = 300
+
+
+@dataclass(frozen=True)
+class PhotoPayload:
+    content: bytes
+    mime_type: str
+    expires_at: float
+
+
+photo_store: dict[str, PhotoPayload] = {}
 
 
 @asynccontextmanager
@@ -31,6 +50,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("INTERNAL_API_TOKEN is required in production")
     logger.info("internal API started")
     yield
+    photo_store.clear()
     ldap_client.close_pool()
     await close_http_client()
     logger.info("internal API stopped")
@@ -47,6 +67,7 @@ async def health() -> Dict[str, str]:
 @app.post("/api/search", response_model=InternalSearchResponse)
 async def search(
     payload: InternalSearchRequest,
+    request: Request,
     authorization: str | None = Header(default=None),
 ) -> InternalSearchResponse:
     _authorize(authorization)
@@ -79,11 +100,46 @@ async def search(
         enriched_results = limited_results
     return InternalSearchResponse(
         results=[
-            InternalSearchResult.from_search_result(result)
+            InternalSearchResult.from_search_result(
+                result,
+                photo_url=_photo_url(request, result),
+            )
             for result in enriched_results
         ],
         has_more=len(results) > settings.search_limit,
     )
+
+
+@app.get("/api/photos/{token}")
+async def photo(token: str) -> Response:
+    _prune_expired_photos()
+    payload = photo_store.get(token)
+    if payload is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return Response(content=payload.content, media_type=payload.mime_type)
+
+
+def _photo_url(request: Request, result: SearchResult) -> str | None:
+    if not result.photo:
+        return None
+    _prune_expired_photos()
+    token = secrets.token_urlsafe(32)
+    photo_store[token] = PhotoPayload(
+        content=result.photo,
+        mime_type=_photo_mime_type(result.photo),
+        expires_at=time.monotonic() + PHOTO_TTL_SECONDS,
+    )
+    return str(request.url_for("photo", token=token))
+
+
+def _prune_expired_photos() -> None:
+    now = time.monotonic()
+    expired_tokens = [
+        token for token, payload in photo_store.items()
+        if payload.expires_at <= now
+    ]
+    for token in expired_tokens:
+        photo_store.pop(token, None)
 
 
 def _authorize(authorization: str | None) -> None:

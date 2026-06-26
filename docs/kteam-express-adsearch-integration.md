@@ -72,6 +72,7 @@ adsearch-express-bot-1   Up (healthy)   0.0.0.0:8181->8000/tcp
 Тестовый запрос `POST /api/search` с Bearer-токеном возвращает JSON с
 `results` и `has_more`. Значение `express_chat_url` может быть `null`, если
 профиль eXpress не найден по email или временно недоступен lookup BotX.
+Значение `photo_url` может быть `null`, если фото отсутствует или недоступно.
 
 После обновления `adsearch-express`:
 
@@ -144,15 +145,21 @@ Content-Type: application/json
       "room": "317",
       "birthday": "24 июня",
       "manager": "Петров Петр",
-      "express_chat_url": "https://xlnk.ms/open/profile/..."
+      "express_chat_url": "https://xlnk.ms/open/profile/...",
+      "photo_url": "http://adsearch-api:8000/api/photos/example-token"
     }
   ],
   "has_more": false
 }
 ```
 
-Поля без значений приходят как `null`. Фотографии, LDAP DN и внутренние
-идентификаторы не возвращаются.
+Поля без значений приходят как `null`. Фотографии не возвращаются в JSON и не
+кодируются в base64: если фото есть, API отдаёт короткоживущий `photo_url`.
+LDAP DN и внутренние идентификаторы не возвращаются.
+
+`kteam-express` может скачать `photo_url` серверной частью и отправить фото в
+своей карточке. Если скачать фото не удалось, нужно показать карточку без фото.
+Не логировать `photo_url` рядом с ФИО, email или другими персональными данными.
 
 ## Обработка ответов
 
@@ -249,7 +256,8 @@ Node.js/Python helper и т.п.).
    422 -> некорректный запрос, минимум 2 символа;
    503/timeout/network error -> справочник временно недоступен.
 5. Не логировать ФИО, email, полный JSON ответа и токен.
-6. Учитывать, что express_chat_url может быть null.
+6. Учитывать, что express_chat_url и photo_url могут быть null.
+7. Если photo_url не null, скачать фото серверной частью и приложить к карточке; при ошибке скачивания показать карточку без фото.
 
 Проверка из контейнера:
 docker compose exec -T kteam-express sh -lc 'wget -qO- http://adsearch-api:8000/health'

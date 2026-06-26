@@ -29,6 +29,7 @@ def api_context(monkeypatch, tmp_path):
     ldap_client = MagicMock()
     monkeypatch.setattr(api_main, "settings", settings)
     monkeypatch.setattr(api_main, "ldap_client", ldap_client)
+    api_main.photo_store.clear()
     monkeypatch.setattr(
         api_main,
         "_enrich_results_with_express_links",
@@ -36,6 +37,7 @@ def api_context(monkeypatch, tmp_path):
     )
     with TestClient(api_main.app) as client:
         yield api_main, client, ldap_client
+    api_main.photo_store.clear()
 
 
 def _headers(token: str = "test-internal-token") -> dict[str, str]:
@@ -173,7 +175,7 @@ class TestInternalSearchApi:
             _result(
                 title=None,
                 department=None,
-                photo=b"secret photo",
+                photo=None,
             )
         ]
 
@@ -186,9 +188,51 @@ class TestInternalSearchApi:
         result = response.json()["results"][0]
         assert result["title"] is None
         assert result["department"] is None
+        assert result["photo_url"] is None
         assert "photo" not in result
         assert "object_id" not in result
         assert "object_type" not in result
+
+    def test_photo_url_is_returned_without_base64_photo(self, api_context):
+        _, client, ldap_client = api_context
+        photo = b"\xff\xd8\xff\xe0 test photo bytes"
+        ldap_client.search_people.return_value = [_result(photo=photo)]
+
+        response = client.post(
+            "/api/search",
+            headers=_headers(),
+            json={"query": "Иванов"},
+        )
+
+        result = response.json()["results"][0]
+        assert "photo" not in result
+        assert result["photo_url"].startswith("http://testserver/api/photos/")
+        assert "test photo bytes" not in response.text
+
+        photo_response = client.get(result["photo_url"])
+        assert photo_response.status_code == 200
+        assert photo_response.headers["content-type"] == "image/jpeg"
+        assert photo_response.content == photo
+
+    def test_photo_url_is_null_when_photo_is_absent(self, api_context):
+        _, client, ldap_client = api_context
+        ldap_client.search_people.return_value = [_result(photo=None)]
+
+        response = client.post(
+            "/api/search",
+            headers=_headers(),
+            json={"query": "Иванов"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["results"][0]["photo_url"] is None
+
+    def test_missing_photo_token_returns_404(self, api_context):
+        _, client, _ = api_context
+
+        response = client.get("/api/photos/missing")
+
+        assert response.status_code == 404
 
     def test_profile_enrichment_failure_does_not_fail_search(self, api_context):
         api_main, client, ldap_client = api_context
