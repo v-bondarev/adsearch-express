@@ -276,10 +276,16 @@ def _manager_display_name(manager_dn: Optional[str]) -> Optional[str]:
 def _split_office_room(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     if not value:
         return None, None
-    if "\\" not in value:
+    separator = "\\" if "\\" in value else ":" if ":" in value else None
+    if separator is None:
         return _normalize_office(value), None
-    office, room = value.split("\\", 1)
-    return _normalize_office(office), room.strip() or None
+    office, room = value.split(separator, 1)
+    return _normalize_office(office), _normalize_room(room)
+
+
+def _normalize_room(value: str) -> Optional[str]:
+    normalized = value.strip().lstrip(":\\/ ").strip()
+    return normalized or None
 
 
 def _normalize_office(value: str) -> Optional[str]:

@@ -282,6 +282,18 @@ class TestEntryConversion:
         assert office == "БЯ9"
         assert room == "317"
 
+    def test_split_office_room_with_colon(self):
+        """Test _split_office_room splits on colon."""
+        office, room = _split_office_room("БЯ-7:13")
+        assert office == "БЯ7"
+        assert room == "13"
+
+    def test_split_office_room_strips_leading_room_separators(self):
+        """Test _split_office_room strips extra leading room separators."""
+        office, room = _split_office_room("БЯ-7\\ :13")
+        assert office == "БЯ7"
+        assert room == "13"
+
     def test_split_office_room_without_backslash(self):
         """Test _split_office_room returns office only when no backslash."""
         office, room = _split_office_room("Офис-1")
