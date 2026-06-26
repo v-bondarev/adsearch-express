@@ -125,6 +125,10 @@ curl -sS http://127.0.0.1:8183/api/search \
   -d '{"query":"Иванов"}'
 ```
 
+Если найдено больше записей, чем разрешено `SEARCH_LIMIT`, ответ содержит
+`"has_more": true`. Поле `express_chat_url` может быть `null`, если профиль
+eXpress не найден по email или lookup BotX временно недоступен.
+
 Пример ответа:
 
 ```json

@@ -62,6 +62,17 @@ http://127.0.0.1:8183
 http://adsearch-api:8000
 ```
 
+Фактическая проверка на VM после пересоздания сети:
+
+```text
+adsearch-express-api-1   Up (healthy)   127.0.0.1:8183->8000/tcp
+adsearch-express-bot-1   Up (healthy)   0.0.0.0:8181->8000/tcp
+```
+
+Тестовый запрос `POST /api/search` с Bearer-токеном возвращает JSON с
+`results` и `has_more`. Значение `express_chat_url` может быть `null`, если
+профиль eXpress не найден по email или временно недоступен lookup BotX.
+
 После обновления `adsearch-express`:
 
 ```bash
@@ -201,3 +212,54 @@ Node.js/Python helper и т.п.).
 8. network timeout;
 9. отсутствующий `ADSEARCH_TOKEN`;
 10. используется `ADSEARCH_URL=http://adsearch-api:8000`, а не localhost.
+
+## Бриф для соседнего чата
+
+Передать в чат `kteam-express` такой контекст:
+
+```text
+Нужно подключить kteam-express к внутреннему API adsearch-express.
+
+Инфраструктура:
+- оба приложения работают в Docker на одной VM;
+- Docker-сеть уже создана: adsearch-internal;
+- подсеть сети: 192.168.240.0/24;
+- сервис adsearch-express api доступен в этой сети по DNS alias adsearch-api;
+- URL из контейнера kteam-express: http://adsearch-api:8000;
+- localhost/127.0.0.1 внутри kteam-express не использовать, это будет сам контейнер kteam-express;
+- внешний loopback-порт adsearch-express api для проверок с VM: http://127.0.0.1:8183.
+
+Нужно внести в kteam-express:
+1. Подключить сервис kteam-express к external Docker network adsearch-internal.
+2. Добавить env:
+   ADSEARCH_URL=http://adsearch-api:8000
+   ADSEARCH_TOKEN=<значение INTERNAL_API_TOKEN из /opt/adsearch-express/.env>
+   ADSEARCH_TIMEOUT_MS=10000
+3. Реализовать HTTP-клиент:
+   POST ${ADSEARCH_URL}/api/search
+   Header: Authorization: Bearer ${ADSEARCH_TOKEN}
+   Header: Content-Type: application/json
+   Body: {"query":"<строка поиска>"}
+4. Обрабатывать ответы:
+   200 results[] -> карточки сотрудников;
+   200 results=[] -> сотрудник не найден;
+   200 has_more=true -> показать подсказку уточнить запрос;
+   401 -> ошибка конфигурации токена, в пользовательский чат без деталей;
+   403 -> доступ к информации ограничен;
+   422 -> некорректный запрос, минимум 2 символа;
+   503/timeout/network error -> справочник временно недоступен.
+5. Не логировать ФИО, email, полный JSON ответа и токен.
+6. Учитывать, что express_chat_url может быть null.
+
+Проверка из контейнера:
+docker compose exec -T kteam-express sh -lc 'wget -qO- http://adsearch-api:8000/health'
+
+Проверка поиска:
+docker compose exec -T kteam-express sh -lc '
+  wget -qO- \
+    --header="Authorization: Bearer $ADSEARCH_TOKEN" \
+    --header="Content-Type: application/json" \
+    --post-data="{\"query\":\"Иванов\"}" \
+    "$ADSEARCH_URL/api/search"
+'
+```
